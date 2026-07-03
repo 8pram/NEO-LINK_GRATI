@@ -1074,3 +1074,13 @@ input, select {
     width: auto;
     padding: 0.5rem;
 }
+
+@keyframes blinkRed {
+    0% { border-color: var(--gray-border); box-shadow: none; background-color: #fafbfc; }
+    50% { border-color: var(--danger); box-shadow: 0 0 0 3px var(--danger-light); background-color: #fef2f2; }
+    100% { border-color: var(--gray-border); box-shadow: none; background-color: #fafbfc; }
+}
+.error-blink {
+    animation: blinkRed 1s infinite;
+    border-color: var(--danger) !important;
+}

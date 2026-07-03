@@ -24,8 +24,8 @@ const scriptURL = 'https://script.google.com/macros/s/AKfycbxb2l_akdbIaN5SHf0oZo
 const emptyForm = {
     id: null, no: '', nama_pasien: '', tgl_lahir: '', no_register: '', jenis_kelamin: '', tgl_kunjungan_rs: '', umur_bayi: '', kelainan_kongenital: '',
     umur_kehamilan: '', bb_lahir: '', hamil_ke: '', jenis_kehamilan: '', cara_lahir: '', indikasi_ibu: '', apgar_score: '', mendapat_resusitasi: '',
-    status_rujukan: '', diagnosa_rujukan: '', terapi_infus: false, terapi_antibiotik: false, terapi_obat_kejang: false, terapi_lain: '',
-    diagnosa_awal: '', diagnosa_akhir: '', alat_tpeace: false, alat_o2nasal: false, alat_cpap: false, alat_venti: false,
+    status_rujukan: '', diagnosa_rujukan: '', terapi_infus: false, terapi_antibiotik: false, terapi_obat_kejang: false, terapi_nihil: false, terapi_lain: '',
+    diagnosa_awal: '', diagnosa_akhir: '', alat_tpeace: false, alat_o2nasal: false, alat_cpap: false, alat_venti: false, alat_nihil: false,
     minum: '', imunisasi: '', cairan_parenteral: '', pmk: '', kondisi_krs: '',
     tgl_kunjungan_bidan: '', bb_kunjungan: '', pb_kunjungan: '', keadaan_umum: '', suhu: '', nadi: '', pernafasan: '',
     kemampuan_menyusu: '', kemampuan_ibu_menyusui: '', pelaksanaan_pmk: '', tanda_kegawatan: '', tindakan_kegawatan: '', hasil: '', kontrol: '',
@@ -43,6 +43,32 @@ function updateState(newState) {
 
 function handleInput(field, value, isCheckbox = false) {
     state.formData[field] = isCheckbox ? value === true : value;
+
+    if (field === 'terapi_nihil' && value) {
+        state.formData.terapi_infus = false;
+        state.formData.terapi_antibiotik = false;
+        state.formData.terapi_obat_kejang = false;
+        if(document.getElementById('terapi_infus')) document.getElementById('terapi_infus').checked = false;
+        if(document.getElementById('terapi_antibiotik')) document.getElementById('terapi_antibiotik').checked = false;
+        if(document.getElementById('terapi_obat_kejang')) document.getElementById('terapi_obat_kejang').checked = false;
+    } else if ((field === 'terapi_infus' || field === 'terapi_antibiotik' || field === 'terapi_obat_kejang') && value) {
+        state.formData.terapi_nihil = false;
+        if(document.getElementById('terapi_nihil')) document.getElementById('terapi_nihil').checked = false;
+    }
+
+    if (field === 'alat_nihil' && value) {
+        state.formData.alat_tpeace = false;
+        state.formData.alat_o2nasal = false;
+        state.formData.alat_cpap = false;
+        state.formData.alat_venti = false;
+        if(document.getElementById('alat_tpeace')) document.getElementById('alat_tpeace').checked = false;
+        if(document.getElementById('alat_o2nasal')) document.getElementById('alat_o2nasal').checked = false;
+        if(document.getElementById('alat_cpap')) document.getElementById('alat_cpap').checked = false;
+        if(document.getElementById('alat_venti')) document.getElementById('alat_venti').checked = false;
+    } else if ((field === 'alat_tpeace' || field === 'alat_o2nasal' || field === 'alat_cpap' || field === 'alat_venti') && value) {
+        state.formData.alat_nihil = false;
+        if(document.getElementById('alat_nihil')) document.getElementById('alat_nihil').checked = false;
+    }
 }
 
 // Multi-File Upload Handler
@@ -349,7 +375,7 @@ function createInput(label, id, type = 'text', value, options = null, disabled =
         inputHTML = `<select class="form-select" id="${id}" ${disabledAttr} onchange="handleInput('${id}', this.value)">${opts}</select>`;
     } else if (type === 'textarea') {
         const valAttr = value || '';
-        inputHTML = `<textarea class="form-input" id="${id}" placeholder="${placeholder}" ${disabledAttr} onchange="handleInput('${id}', this.value)" rows="3" style="resize: vertical; font-family: inherit;">${valAttr}</textarea>`;
+        inputHTML = `<textarea class="form-input" id="${id}" placeholder="${placeholder}" ${disabledAttr} onchange="handleInput('${id}', this.value)" rows="5" style="resize: vertical; font-family: inherit;">${valAttr}</textarea>`;
     } else {
         const valAttr = value ? `value="${value}"` : '';
         inputHTML = `<input class="form-input" type="${type}" id="${id}" ${valAttr} placeholder="${placeholder}" ${disabledAttr} onchange="handleInput('${id}', this.value)">`;
@@ -457,6 +483,7 @@ function renderForm() {
                                     ${createCheckbox('Infus', 'terapi_infus', f.terapi_infus, lockRsudFields)}
                                     ${createCheckbox('Antibiotik', 'terapi_antibiotik', f.terapi_antibiotik, lockRsudFields)}
                                     ${createCheckbox('Obat Kejang', 'terapi_obat_kejang', f.terapi_obat_kejang, lockRsudFields)}
+                                    ${createCheckbox('Nihil / Tidak Ada', 'terapi_nihil', f.terapi_nihil, lockRsudFields)}
                                 </div>
                             </div>
                             ${createInput('Obat Lainnya', 'terapi_lain', 'textarea', f.terapi_lain, null, lockRsudFields, 'Obat Lain...')}
@@ -477,6 +504,7 @@ function renderForm() {
                                     ${createCheckbox('O2 Nasal', 'alat_o2nasal', f.alat_o2nasal, lockRsudFields)}
                                     ${createCheckbox('CPAP/NIV', 'alat_cpap', f.alat_cpap, lockRsudFields)}
                                     ${createCheckbox('Venti', 'alat_venti', f.alat_venti, lockRsudFields)}
+                                    ${createCheckbox('Nihil / Tidak Ada', 'alat_nihil', f.alat_nihil, lockRsudFields)}
                                 </div>
                             </div>
                             
@@ -603,6 +631,30 @@ window.editRecord = function(id) {
 
 window.submitForm = async function(e) {
     e.preventDefault();
+    
+    // Validation
+    const form = e.target;
+    const inputs = form.querySelectorAll('input:not([type="file"]):not([disabled]):not([type="checkbox"]), select:not([disabled]), textarea:not([disabled])');
+    const optionalFields = ['kelainan_kongenital', 'indikasi_ibu', 'diagnosa_rujukan', 'terapi_lain', 'tanda_kegawatan', 'tindakan_kegawatan'];
+    let hasError = false;
+    
+    inputs.forEach(input => {
+        input.classList.remove('error-blink');
+        if (!optionalFields.includes(input.id) && !input.value.trim()) {
+            hasError = true;
+            input.classList.add('error-blink');
+        }
+    });
+    
+    if (hasError) {
+        alert("⚠️ Terdapat data wajib yang belum diisi. Mohon periksa kolom yang berkedip merah.");
+        return;
+    }
+
+    if (!confirm("Apakah data yang Anda input sudah benar?\n\nPilih 'OK/Simpan' untuk mengirim, atau 'Batal' untuk mengecek kembali.")) {
+        return;
+    }
+
     updateState({ isSubmitting: true });
 
     try {
