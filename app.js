@@ -10,6 +10,8 @@ const state = {
     patients: [],  // Grouped by No RM
     selectedRm: null,
     searchQuery: '',
+    filterDate: '',
+    filterStatus: '',
     currentPage: 1,
     itemsPerPage: 10,
     formData: {},
@@ -137,10 +139,22 @@ function renderHeader() {
 }
 
 function renderList() {
-    const filtered = state.patients.filter(p => 
+    let filtered = state.patients.filter(p => 
         p.nama_pasien.toLowerCase().includes(state.searchQuery.toLowerCase()) || 
         p.no.toLowerCase().includes(state.searchQuery.toLowerCase())
     );
+    
+    if (state.filterDate) {
+        filtered = filtered.filter(p => {
+            return p.latest_krs === state.filterDate || p.history.some(h => h.tgl_kunjungan_bidan === state.filterDate || h.tgl_kunjungan_rs === state.filterDate);
+        });
+    }
+
+    if (state.filterStatus === 'dipantau') {
+        filtered = filtered.filter(p => p.history.some(h => h.tgl_kunjungan_bidan));
+    } else if (state.filterStatus === 'menunggu') {
+        filtered = filtered.filter(p => !p.history.some(h => h.tgl_kunjungan_bidan));
+    }
     
     const totalPages = Math.ceil(filtered.length / state.itemsPerPage);
     const startIndex = (state.currentPage - 1) * state.itemsPerPage;
@@ -154,18 +168,26 @@ function renderList() {
                 ? `<span class="badge-status success">✓ Telah Dipantau</span>` 
                 : `<span class="badge-status warning">⏳ Menunggu Pemantauan</span>`;
             
+            const lastRecord = row.history[row.history.length - 1];
+            let perkembangan = '-';
+            if (lastRecord.tgl_kunjungan_bidan) {
+                perkembangan = `Pantau Bidan: ${lastRecord.hasil || 'Dipantau'}`;
+            } else if (lastRecord.tgl_kunjungan_rs) {
+                let kondisi = lastRecord.kondisi_krs || 'Selesai Rawat';
+                perkembangan = `RSUD: ${kondisi}`;
+            } else {
+                perkembangan = 'Baru';
+            }
+
             tableRows += `
-                <tr>
+                <tr onclick="viewPatient('${row.no}')" style="cursor: pointer;" title="Klik untuk melihat riwayat lengkap">
                     <td class="font-medium">${row.no}</td>
                     <td>${row.nama_pasien}</td>
-                    <td>
-                        <div>L: ${row.tgl_lahir}</div>
-                        <div class="text-sm-gray">KRS Terakhir: ${row.latest_krs || '-'}</div>
-                    </td>
-                    <td><span class="badge">${row.latest_diagnosa || '-'}</span></td>
+                    <td>${row.tgl_lahir}</td>
+                    <td><span class="badge">${perkembangan}</span></td>
                     <td>${statusBadge}</td>
                     <td>
-                        <button class="btn-action ${state.role}" onclick="viewPatient('${row.no}')">
+                        <button class="btn-action ${state.role}" onclick="event.stopPropagation(); viewPatient('${row.no}')">
                             Lihat Riwayat
                         </button>
                     </td>
@@ -198,6 +220,14 @@ function renderList() {
                         <span class="search-icon">🔍</span>
                         <input type="text" placeholder="Cari No RM / Nama Pasien..." value="${state.searchQuery}" oninput="updateState({searchQuery: this.value, currentPage: 1})">
                     </div>
+                    <div class="filter-box">
+                        <input type="date" class="form-input filter-input" value="${state.filterDate || ''}" onchange="updateState({filterDate: this.value, currentPage: 1})" title="Filter Tanggal">
+                        <select class="form-select filter-select" onchange="updateState({filterStatus: this.value, currentPage: 1})">
+                            <option value="">Semua Status</option>
+                            <option value="dipantau" ${state.filterStatus === 'dipantau' ? 'selected' : ''}>Telah Dipantau</option>
+                            <option value="menunggu" ${state.filterStatus === 'menunggu' ? 'selected' : ''}>Menunggu Pemantauan</option>
+                        </select>
+                    </div>
                     ${newBtn}
                 </div>
             <div style="overflow-x: auto;">
@@ -206,7 +236,7 @@ function renderList() {
                         <tr>
                             <th>No RM</th>
                             <th>Nama Pasien</th>
-                            <th>Tgl Lahir / KRS</th>
+                            <th>Tgl Lahir</th>
                             <th>Kondisi Terakhir</th>
                             <th>Status</th>
                             <th>Aksi</th>
@@ -298,8 +328,10 @@ function renderPatientDetail() {
                 ${state.role === 'bidan' ? `<button class="btn-primary" style="background-color: var(--bidan-primary);" onclick="addControl('bidan')">+ Tambah Pemantauan (Tahap 5)</button>` : ''}
             </div>
 
-            <div class="timeline">
-                ${timelineHTML}
+            <div class="timeline-container">
+                <div class="timeline">
+                    ${timelineHTML}
+                </div>
             </div>
         </div>
     `;

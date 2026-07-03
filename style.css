@@ -62,10 +62,39 @@
 
 body {
     font-family: 'Inter', sans-serif;
-    background-color: var(--bg-main);
+    background-color: #f8fafc; /* Very soft grayish blue */
     color: var(--text-primary);
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    position: relative;
+    overflow-x: hidden;
+}
+
+/* Soft Background Ornaments */
+body::before, body::after {
+    content: '';
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(120px);
+    z-index: -1;
+    opacity: 0.6;
+}
+
+body::before {
+    top: -10%;
+    left: -5%;
+    width: 500px;
+    height: 500px;
+    background-color: var(--rsud-border); /* Soft blue */
+}
+
+body::after {
+    bottom: -10%;
+    right: -5%;
+    width: 600px;
+    height: 600px;
+    background-color: var(--bidan-border); /* Soft pink */
 }
 
 h1, h2, h3, h4 {
@@ -1018,4 +1047,30 @@ input, select {
 .timeline-title {
     font-weight: 600;
     font-size: 1.125rem;
+}
+
+/* Scrollable Timeline Container */
+.timeline-container {
+    max-height: 60vh;
+    overflow-y: auto;
+    padding-right: 1rem;
+}
+.timeline-container::-webkit-scrollbar {
+    width: 6px;
+}
+.timeline-container::-webkit-scrollbar-thumb {
+    background: var(--gray-border);
+    border-radius: 4px;
+}
+
+/* Filter Box */
+.filter-box {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.filter-input, .filter-select {
+    width: auto;
+    padding: 0.5rem;
 }
