@@ -617,7 +617,7 @@ window.initApp = async function() {
     const splash = document.getElementById('splash-screen');
     if (splash) {
         splash.classList.add('hidden');
-        setTimeout(() => splash.remove(), 600);
+        setTimeout(() => splash.style.display = 'none', 600);
     }
 };
 
