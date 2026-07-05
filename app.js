@@ -290,11 +290,11 @@ function renderHeader() {
                     ⏱️ --
                 </div>
             </div>
-            <div class="role-switcher" style="flex-wrap: wrap; gap: 0.75rem; padding: 0.75rem;">
-                <div style="font-weight: 500; color: var(--text-secondary); display: flex; align-items: center; width: 100%; margin-bottom: 0.25rem;">
+            <div class="role-switcher header-controls" style="display: flex; gap: 0.75rem; align-items: center; padding: 0.5rem; background: var(--gray-light); border: 1px solid var(--gray-border); border-radius: var(--radius-md);">
+                <span style="font-weight: 500; color: var(--text-secondary); display: flex; align-items: center; white-space: nowrap;">
                     Login sebagai: <span style="color: var(--text-main); font-weight: 700; margin-left: 0.5rem; padding: 0.25rem 0.75rem; background: white; border-radius: 20px; border: 1px solid var(--gray-border);">${roleText}</span>
-                </div>
-                <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; width: 100%; justify-content: flex-start;">
+                </span>
+                <div style="display: flex; gap: 0.5rem; align-items: center; margin-left: auto;">
                     ${(state.role === 'superadmin' || state.role === 'dinkes') ? `
                         <button class="btn-role" onclick="updateState({view: 'dashboard'})" style="${state.view === 'dashboard' ? 'background: #3b82f6; color: white;' : 'color: #3b82f6; border: 1px solid #3b82f6; background: rgba(59,130,246,0.1);'}">📊 Dashboard</button>
                         <button class="btn-role" onclick="updateState({view: 'list', currentPage: 1})" style="${state.view === 'list' ? 'background: #3b82f6; color: white;' : 'color: #3b82f6; border: 1px solid #3b82f6; background: rgba(59,130,246,0.1);'}">📋 Daftar Pasien</button>
@@ -358,14 +358,14 @@ function renderList() {
                 perkembangan = 'Baru';
             }
 
-            let tglLahirText = formatDateTime(row.tgl_lahir);
+            let tglLahirText = `<div style="white-space: nowrap;">${formatDateTime(row.tgl_lahir)}</div>`;
             if (lastRecord.umur_bayi) {
-                tglLahirText += ` <span style="color: var(--text-secondary); font-size: 0.8rem; font-weight: 500;">(${lastRecord.umur_bayi})</span>`;
+                tglLahirText += `<div style="color: var(--text-secondary); font-size: 0.75rem; font-weight: 500; white-space: nowrap;">(${lastRecord.umur_bayi})</div>`;
             }
 
-            let nameCell = row.nama_pasien;
+            let nameCell = `<div style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;">${row.nama_pasien}</div>`;
             if (row.is_dirujuk) {
-                nameCell += `<div style="margin-top: 4px;"><span class="badge warning" style="font-size: 0.7rem; background-color: #fee2e2; color: #ef4444; border: 1px solid #fca5a5;">Dirujuk ke: ${row.lokasi_rujukan_lanjutan}</span></div>`;
+                nameCell += `<div style="margin-top: 2px;"><span class="badge warning" style="font-size: 0.65rem; background-color: #fee2e2; color: #ef4444; border: 1px solid #fca5a5; white-space: nowrap; max-width: 150px; overflow: hidden; text-overflow: ellipsis; display: inline-block;">Dirujuk ke: ${row.lokasi_rujukan_lanjutan}</span></div>`;
             }
 
             let actionBtns = '';
@@ -380,8 +380,8 @@ function renderList() {
                     <td data-label="Tgl Lahir">${tglLahirText}</td>
                     <td data-label="Kondisi Terakhir"><span class="badge">${perkembangan}</span></td>
                     <td data-label="Status">${statusBadge}</td>
-                    <td data-label="Aksi">
-                        ${actionBtns || '<span style="color: var(--text-tertiary); font-size: 0.8rem;">Klik kartu untuk detail ➔</span>'}
+                    <td data-label="Aksi" style="white-space: nowrap;">
+                        ${actionBtns || '<span style="color: var(--text-tertiary); font-size: 0.75rem;">Klik untuk detail ➔</span>'}
                     </td>
                 </tr>
             `;
@@ -497,7 +497,7 @@ function renderPatientDetail() {
                 rsudSection += `</div>`;
             }
             if (h.nama_petugas_rs || h.kontak_petugas_rs) {
-                let waLink = h.kontak_petugas_rs ? h.kontak_petugas_rs.replace(/^0/, '62').replace(/\D/g, '') : '';
+                let waLink = h.kontak_petugas_rs ? String(h.kontak_petugas_rs).replace(/^0/, '62').replace(/\D/g, '') : '';
                 let waBtn = waLink ? `<a href="https://wa.me/${waLink}" target="_blank" class="btn-wa">💬 Hubungi via WA</a>` : '';
                 rsudSection += `
                     <div class="contact-card rsud" style="margin-bottom: 1rem;">
@@ -532,7 +532,7 @@ function renderPatientDetail() {
                 bidanSection += `</div>`;
             }
             if (h.nama_bidan || h.kontak_bidan) {
-                let waLink = h.kontak_bidan ? h.kontak_bidan.replace(/^0/, '62').replace(/\D/g, '') : '';
+                let waLink = h.kontak_bidan ? String(h.kontak_bidan).replace(/^0/, '62').replace(/\D/g, '') : '';
                 let waBtn = waLink ? `<a href="https://wa.me/${waLink}" target="_blank" class="btn-wa">💬 Hubungi via WA</a>` : '';
                 bidanSection += `
                     <div class="contact-card bidan" style="margin-top: 1rem;">
@@ -1202,8 +1202,18 @@ window.exportToPDF = function () {
         head: [['No', 'No RM', 'Nama Pasien', 'Tgl Lahir', 'Diagnosa Terakhir', 'Kondisi Akhir', 'Status Rujukan']],
         body: tableData,
         theme: 'striped',
-        styles: { fontSize: 9 },
-        headStyles: { fillColor: [30, 58, 138] }
+        styles: { fontSize: 8, cellPadding: 2, overflow: 'linebreak' },
+        headStyles: { fillColor: [30, 58, 138], halign: 'center' },
+        columnStyles: {
+            0: { cellWidth: 10 },
+            1: { cellWidth: 25 },
+            2: { cellWidth: 40 },
+            3: { cellWidth: 35 },
+            4: { cellWidth: 'auto' },
+            5: { cellWidth: 40 },
+            6: { cellWidth: 40 }
+        },
+        margin: { top: 35, right: 14, bottom: 15, left: 14 }
     });
 
     doc.save(`Laporan_NEO_LINK_${new Date().getTime()}.pdf`);
@@ -1233,13 +1243,44 @@ window.exportToExcel = function () {
             "No": idx + 1,
             "No RM": p.no,
             "Nama Pasien": p.nama_pasien,
-            "Tanggal Lahir": formatForDateInput(p.tgl_lahir),
-            "Jenis Kelamin": last.jenis_kelamin || '-',
-            "Diagnosa Akhir": last.diagnosa_akhir || '-',
-            "Kondisi KRS": last.kondisi_krs || '-',
-            "Hasil Pemantauan Bidan": last.hasil || '-',
-            "Status Rujukan Lanjutan": p.is_dirujuk ? "YA" : "TIDAK",
-            "Lokasi Rujukan": p.lokasi_rujukan_lanjutan || '-'
+            "Tgl Lahir": formatForDateInput(p.tgl_lahir),
+            "Jenis Kelamin": last.jenis_kelamin || '',
+            "BB Lahir": last.bb_lahir || '',
+            "PB Lahir": last.pb_lahir || '',
+            "Cara Lahir": last.cara_lahir || '',
+            "Tgl Kunjungan RS": formatForDateInput(last.tgl_kunjungan_rs) || '',
+            "Diagnosa Awal": last.diagnosa_awal || '',
+            "Terapi Tahap 1 RS": last.terapi_tahap_1_rs || '',
+            "Terapi Tahap 2 RS": last.terapi_tahap_2_rs || '',
+            "Terapi Tahap 3 RS": last.terapi_tahap_3_rs || '',
+            "Terapi Tahap 4 RS": last.terapi_tahap_4_rs || '',
+            "Alat Nafas": last.alat_nafas || '',
+            "Kondisi KRS": last.kondisi_krs || '',
+            "Diagnosa Akhir": last.diagnosa_akhir || '',
+            "PMK": last.pmk || '',
+            "Minum": last.minum || '',
+            "Imunisasi": last.imunisasi || '',
+            "Nama Petugas RS": last.nama_petugas_rs || '',
+            "Kontak Petugas RS": last.kontak_petugas_rs || '',
+            "Tgl Kunjungan Bidan": formatForDateInput(last.tgl_kunjungan_bidan) || '',
+            "Keadaan Umum": last.keadaan_umum || '',
+            "Suhu": last.suhu || '',
+            "Nadi": last.nadi || '',
+            "Pernafasan": last.pernafasan || '',
+            "BB Kunjungan": last.bb_kunjungan || '',
+            "PB Kunjungan": last.pb_kunjungan || '',
+            "Kemampuan Menyusu": last.kemampuan_menyusu || '',
+            "Kemampuan Ibu Menyusui": last.kemampuan_ibu_menyusui || '',
+            "Tanda Kegawatan": last.tanda_kegawatan || '',
+            "Tindakan Kegawatan": last.tindakan_kegawatan || '',
+            "Hasil": last.hasil || '',
+            "Kontrol": last.kontrol || '',
+            "Nama Bidan": last.nama_bidan || '',
+            "Kontak Bidan": last.kontak_bidan || '',
+            "Is Dirujuk Lanjutan": p.is_dirujuk ? 'TRUE' : 'FALSE',
+            "Lokasi Rujukan Lanjutan": p.lokasi_rujukan_lanjutan || '',
+            "Diagnosa Rujukan": p.diagnosa_rujukan || '',
+            "Status Rujukan": p.status_rujukan || ''
         };
     });
 
@@ -1403,7 +1444,7 @@ function renderDashboard() {
                     <h3 style="text-align: center; margin-bottom: 1rem; color: var(--text-main);">Kondisi Keluar RS (KRS)</h3>
                     <div style="position: relative; height: 250px;"><canvas id="chart-krs"></canvas></div>
                 </div>
-                <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); grid-column: 1 / -1; max-width: 600px; margin: 0 auto; width: 100%;">
+                <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
                     <h3 style="text-align: center; margin-bottom: 1rem; color: var(--text-main);">Pasien Dirujuk Lanjutan</h3>
                     <div style="position: relative; height: 250px;"><canvas id="chart-rujukan"></canvas></div>
                 </div>
@@ -1484,11 +1525,9 @@ function initDashboardCharts() {
         const ctx = document.getElementById(id);
         if (!ctx) return;
         if (dashCharts[id]) {
-            dashCharts[id].data.labels = labels;
-            dashCharts[id].data.datasets[0].data = data;
-            dashCharts[id].update();
-        } else {
-            dashCharts[id] = new Chart(ctx, {
+            dashCharts[id].destroy();
+        }
+        dashCharts[id] = new Chart(ctx, {
                 type: type,
                 data: {
                     labels: labels,
@@ -1505,7 +1544,6 @@ function initDashboardCharts() {
                     scales: (type === 'bar') ? { y: { beginAtZero: true, ticks: { stepSize: 1 } } } : {}
                 }
             });
-        }
     };
 
     createOrUpdate('chart-jk', 'doughnut', Object.keys(jkCount), Object.values(jkCount), ['#3b82f6', '#ec4899', '#f59e0b']);
