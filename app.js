@@ -7,11 +7,13 @@ const state = {
     role: null, // 'rsud' or 'bidan' or 'dinkes' or 'superadmin'
     view: 'login',  // 'login', 'list', 'detail', 'form'
     records: [],   // All raw records from Google Sheet
-    patients: [],  // Grouped by No RM
+    settings: [],  // User Role & Passwords
     selectedRm: null,
     searchQuery: '',
-    filterDate: '',
-    filterStatus: '',
+    filterStartDate: '',
+    filterEndDate: '',
+    dashboardMonth: 'all',
+    dashboardYear: new Date().getFullYear(),
     currentPage: 1,
     itemsPerPage: 10,
     formData: {},
@@ -69,7 +71,7 @@ function formatForDateTimeInput(dateStr) {
     return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
-window.showConfirmModal = function(icon, title, message, confirmText, confirmClass, onConfirm) {
+window.showConfirmModal = function (icon, title, message, confirmText, confirmClass, onConfirm) {
     const modalHtml = `
         <div id="custom-modal" class="modal-overlay fade-in">
             <div class="modal-content scale-in">
@@ -107,12 +109,12 @@ function handleInput(field, value, isCheckbox = false) {
         state.formData.terapi_infus = false;
         state.formData.terapi_antibiotik = false;
         state.formData.terapi_obat_kejang = false;
-        if(document.getElementById('terapi_infus')) document.getElementById('terapi_infus').checked = false;
-        if(document.getElementById('terapi_antibiotik')) document.getElementById('terapi_antibiotik').checked = false;
-        if(document.getElementById('terapi_obat_kejang')) document.getElementById('terapi_obat_kejang').checked = false;
+        if (document.getElementById('terapi_infus')) document.getElementById('terapi_infus').checked = false;
+        if (document.getElementById('terapi_antibiotik')) document.getElementById('terapi_antibiotik').checked = false;
+        if (document.getElementById('terapi_obat_kejang')) document.getElementById('terapi_obat_kejang').checked = false;
     } else if ((field === 'terapi_infus' || field === 'terapi_antibiotik' || field === 'terapi_obat_kejang') && value) {
         state.formData.terapi_nihil = false;
-        if(document.getElementById('terapi_nihil')) document.getElementById('terapi_nihil').checked = false;
+        if (document.getElementById('terapi_nihil')) document.getElementById('terapi_nihil').checked = false;
     }
 
     if (field === 'alat_nihil' && value) {
@@ -120,13 +122,13 @@ function handleInput(field, value, isCheckbox = false) {
         state.formData.alat_o2nasal = false;
         state.formData.alat_cpap = false;
         state.formData.alat_venti = false;
-        if(document.getElementById('alat_tpeace')) document.getElementById('alat_tpeace').checked = false;
-        if(document.getElementById('alat_o2nasal')) document.getElementById('alat_o2nasal').checked = false;
-        if(document.getElementById('alat_cpap')) document.getElementById('alat_cpap').checked = false;
-        if(document.getElementById('alat_venti')) document.getElementById('alat_venti').checked = false;
+        if (document.getElementById('alat_tpeace')) document.getElementById('alat_tpeace').checked = false;
+        if (document.getElementById('alat_o2nasal')) document.getElementById('alat_o2nasal').checked = false;
+        if (document.getElementById('alat_cpap')) document.getElementById('alat_cpap').checked = false;
+        if (document.getElementById('alat_venti')) document.getElementById('alat_venti').checked = false;
     } else if ((field === 'alat_tpeace' || field === 'alat_o2nasal' || field === 'alat_cpap' || field === 'alat_venti') && value) {
         state.formData.alat_nihil = false;
-        if(document.getElementById('alat_nihil')) document.getElementById('alat_nihil').checked = false;
+        if (document.getElementById('alat_nihil')) document.getElementById('alat_nihil').checked = false;
     }
     if (field === 'tgl_lahir' || field === 'tgl_kunjungan_rs') {
         if (state.formData.tgl_lahir) {
@@ -136,7 +138,7 @@ function handleInput(field, value, isCheckbox = false) {
                 let diffTime = tglKunjungan.getTime() - tglLahir.getTime();
                 if (diffTime < 0) diffTime = 0;
                 const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-                
+
                 let umurStr = '';
                 if (diffDays === 0) umurStr = '0 Hari';
                 else if (diffDays < 30) umurStr = `${diffDays} Hari`;
@@ -145,7 +147,7 @@ function handleInput(field, value, isCheckbox = false) {
                     const days = diffDays % 30;
                     umurStr = `${months} Bulan ${days > 0 ? days + ' Hari' : ''}`;
                 }
-                
+
                 state.formData.umur_bayi = umurStr;
                 const umurInput = document.getElementById('umur_bayi');
                 if (umurInput) umurInput.value = umurStr;
@@ -154,7 +156,7 @@ function handleInput(field, value, isCheckbox = false) {
     }
 }
 
-window.autofillContact = function(type, name) {
+window.autofillContact = function (type, name) {
     if (!name) return;
     let contact = '';
     if (type === 'rs') {
@@ -176,7 +178,7 @@ window.autofillContact = function(type, name) {
 };
 
 // Multi-File Upload Handler
-window.handleFileUpload = function(event, fieldPrefix) {
+window.handleFileUpload = function (event, fieldPrefix) {
     const file = event.target.files[0];
     if (!file) return;
 
@@ -187,13 +189,13 @@ window.handleFileUpload = function(event, fieldPrefix) {
     }
 
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = function (e) {
         const base64String = e.target.result.split(',')[1];
-        
+
         state.formData[fieldPrefix] = base64String;
         state.formData[fieldPrefix + '_name'] = file.name;
         state.formData[fieldPrefix + '_type'] = file.type;
-        
+
         const previewEl = document.getElementById(`preview-${fieldPrefix}`);
         const uploadBoxEl = document.getElementById(`box-${fieldPrefix}`);
         if (previewEl && uploadBoxEl) {
@@ -208,10 +210,10 @@ window.handleFileUpload = function(event, fieldPrefix) {
 function processRecords(rawRecords) {
     state.records = rawRecords;
     const grouped = {};
-    
+
     // Sort chronological (oldest first for correct grouping, though id is usually chronological)
     const sorted = [...rawRecords].sort((a, b) => a.id - b.id);
-    
+
     sorted.forEach(record => {
         if (!grouped[record.no]) {
             grouped[record.no] = {
@@ -232,11 +234,11 @@ function processRecords(rawRecords) {
             grouped[record.no].lokasi_rujukan_lanjutan = record.lokasi_rujukan_lanjutan;
         }
     });
-    
+
     state.patients = Object.values(grouped).sort((a, b) => {
         // Sort patients by their latest activity
-        const lastA = a.history[a.history.length-1].id;
-        const lastB = b.history[b.history.length-1].id;
+        const lastA = a.history[a.history.length - 1].id;
+        const lastB = b.history[b.history.length - 1].id;
         return lastB - lastA; // descending
     });
 }
@@ -251,19 +253,19 @@ function renderLogin() {
                 <p style="color: var(--text-secondary); font-size: 1.1rem;">Silakan pilih peran Anda untuk masuk ke sistem NEO-LINK GRATI</p>
             </div>
             <div class="role-cards" style="display: flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center; max-width: 800px;">
-                <button class="btn-role rsud" style="padding: 1.5rem 2rem; font-size: 1.2rem; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; border-radius: 12px;" onclick="updateState({role: 'rsud', view: 'list', currentPage: 1})">
+                <button class="btn-role rsud" style="padding: 1.5rem 2rem; font-size: 1.2rem; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; border-radius: 12px;" onclick="attemptLogin('rsud')">
                     <span style="font-size: 2rem;">🏥</span> Admin Faskes / RS
                 </button>
-                <button class="btn-role bidan" style="padding: 1.5rem 2rem; font-size: 1.2rem; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; border-radius: 12px;" onclick="updateState({role: 'bidan', view: 'list', currentPage: 1})">
+                <button class="btn-role bidan" style="padding: 1.5rem 2rem; font-size: 1.2rem; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; border-radius: 12px;" onclick="attemptLogin('bidan')">
                     <span style="font-size: 2rem;">🌸</span> Bidan Pemantau
                 </button>
-                <button class="btn-role dinkes" style="padding: 1.5rem 2rem; font-size: 1.2rem; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; border-radius: 12px;" onclick="updateState({role: 'dinkes', view: 'list', currentPage: 1})">
+                <button class="btn-role dinkes" style="padding: 1.5rem 2rem; font-size: 1.2rem; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; border-radius: 12px;" onclick="attemptLogin('dinkes')">
                     <span style="font-size: 2rem;">👁️</span> Pengawas (Dinkes)
                 </button>
-                <button class="btn-role superadmin" style="padding: 1.5rem 2rem; font-size: 1.2rem; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; border-radius: 12px;" onclick="loginSuperAdmin()">
+                <button class="btn-role superadmin" style="padding: 1.5rem 2rem; font-size: 1.2rem; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; border-radius: 12px;" onclick="attemptLogin('superadmin')">
                     <span style="font-size: 2rem;">🛡️</span> Superadmin
                 </button>
-                <button class="btn-role faskes_rujukan" style="padding: 1.5rem 2rem; font-size: 1.2rem; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; border-radius: 12px; background: rgba(239, 68, 68, 0.05); border: 1px solid #ef4444;" onclick="updateState({role: 'faskes_rujukan', view: 'list', currentPage: 1})">
+                <button class="btn-role faskes_rujukan" style="padding: 1.5rem 2rem; font-size: 1.2rem; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; border-radius: 12px; background: rgba(239, 68, 68, 0.05); border: 1px solid #ef4444;" onclick="attemptLogin('faskes_rujukan')">
                     <span style="font-size: 2rem;">🚑</span> Faskes Rujukan Lanjutan
                 </button>
             </div>
@@ -273,11 +275,11 @@ function renderLogin() {
 
 function renderHeader() {
     let roleText = '';
-    if(state.role === 'rsud') roleText = '🏥 Admin Faskes / RS';
-    else if(state.role === 'bidan') roleText = '🌸 Bidan Pemantau';
-    else if(state.role === 'dinkes') roleText = '👁️ Pengawas (Dinkes)';
-    else if(state.role === 'superadmin') roleText = '🛡️ Superadmin';
-    else if(state.role === 'faskes_rujukan') roleText = '🚑 Faskes Rujukan Lanjutan';
+    if (state.role === 'rsud') roleText = '🏥 Admin Faskes / RS';
+    else if (state.role === 'bidan') roleText = '🌸 Bidan Pemantau';
+    else if (state.role === 'dinkes') roleText = '👁️ Pengawas (Dinkes)';
+    else if (state.role === 'superadmin') roleText = '🛡️ Superadmin';
+    else if (state.role === 'faskes_rujukan') roleText = '🚑 Faskes Rujukan Lanjutan';
 
     return `
         <div class="app-header fade-in">
@@ -292,6 +294,11 @@ function renderHeader() {
                 <span style="font-weight: 500; color: var(--text-secondary); display: flex; align-items: center;">
                     Login sebagai: <span style="color: var(--text-main); font-weight: 700; margin-left: 0.5rem; padding: 0.25rem 0.75rem; background: var(--bg-main); border-radius: 20px; border: 1px solid var(--border-color);">${roleText}</span>
                 </span>
+                ${(state.role === 'superadmin' || state.role === 'dinkes') ? `
+                    <button class="btn-role" onclick="updateState({view: 'dashboard'})" style="${state.view === 'dashboard' ? 'background: #3b82f6; color: white;' : 'color: #3b82f6; border: 1px solid #3b82f6; background: rgba(59,130,246,0.1);'}">📊 Dashboard</button>
+                    <button class="btn-role" onclick="updateState({view: 'list', currentPage: 1})" style="${state.view === 'list' ? 'background: #3b82f6; color: white;' : 'color: #3b82f6; border: 1px solid #3b82f6; background: rgba(59,130,246,0.1);'}">📋 Daftar Pasien</button>
+                ` : ''}
+                ${state.role === 'superadmin' ? `<button class="btn-role" onclick="showAccountManager()" style="color: #3b82f6; border: 1px solid #3b82f6; background: rgba(59,130,246,0.1);">⚙️ Manajemen Akun</button>` : ''}
                 <button class="btn-role" onclick="exitApp()" style="color: #ef4444; border: 1px solid #ef4444; background: rgba(239,68,68,0.1);">
                     🚪 Keluar
                 </button>
@@ -301,23 +308,26 @@ function renderHeader() {
 }
 
 function renderList() {
-    let filtered = state.patients.filter(p => 
-        p.nama_pasien.toLowerCase().includes(state.searchQuery.toLowerCase()) || 
+    let filtered = state.patients.filter(p =>
+        p.nama_pasien.toLowerCase().includes(state.searchQuery.toLowerCase()) ||
         p.no.toLowerCase().includes(state.searchQuery.toLowerCase())
     );
-    
-    if (state.filterDate) {
+
+    if (state.filterStartDate && state.filterEndDate) {
+        const start = new Date(state.filterStartDate).getTime();
+        const end = new Date(state.filterEndDate).setHours(23, 59, 59, 999);
+
         filtered = filtered.filter(p => {
-            return p.latest_krs === state.filterDate || p.history.some(h => h.tgl_kunjungan_bidan === state.filterDate || h.tgl_kunjungan_rs === state.filterDate);
+            // Check if any history date falls in range
+            return p.history.some(h => {
+                const dateRS = new Date(h.tgl_kunjungan_rs).getTime();
+                const dateBidan = new Date(h.tgl_kunjungan_bidan).getTime();
+                return (!isNaN(dateRS) && dateRS >= start && dateRS <= end) ||
+                    (!isNaN(dateBidan) && dateBidan >= start && dateBidan <= end);
+            });
         });
     }
 
-    if (state.filterStatus === 'dipantau') {
-        filtered = filtered.filter(p => p.history.some(h => h.tgl_kunjungan_bidan));
-    } else if (state.filterStatus === 'menunggu') {
-        filtered = filtered.filter(p => !p.history.some(h => h.tgl_kunjungan_bidan));
-    }
-    
     // Filter khusus Faskes Rujukan Lanjutan
     if (state.role === 'faskes_rujukan') {
         filtered = filtered.filter(p => p.is_dirujuk === true);
@@ -331,10 +341,10 @@ function renderList() {
     if (currentData.length > 0) {
         currentData.forEach(row => {
             const hasBidanVisit = row.history.some(h => h.tgl_kunjungan_bidan);
-            const statusBadge = hasBidanVisit 
-                ? `<span class="badge-status success">✓ Telah Dipantau</span>` 
+            const statusBadge = hasBidanVisit
+                ? `<span class="badge-status success">✓ Telah Dipantau</span>`
                 : `<span class="badge-status warning">⏳ Menunggu Pemantauan</span>`;
-            
+
             const lastRecord = row.history[row.history.length - 1];
             let perkembangan = '-';
             if (lastRecord.tgl_kunjungan_bidan) {
@@ -345,7 +355,7 @@ function renderList() {
             } else {
                 perkembangan = 'Baru';
             }
-            
+
             let tglLahirText = formatDateTime(row.tgl_lahir);
             if (lastRecord.umur_bayi) {
                 tglLahirText += ` <span style="color: var(--text-secondary); font-size: 0.8rem; font-weight: 500;">(${lastRecord.umur_bayi})</span>`;
@@ -378,7 +388,7 @@ function renderList() {
         tableRows = `<tr><td colspan="6" style="text-align:center; padding: 2rem; color: var(--text-secondary);">Tidak ada data pasien.</td></tr>`;
     }
 
-    const newBtn = state.role === 'rsud' 
+    const newBtn = state.role === 'rsud'
         ? `<button class="btn-primary" onclick="newPatient()">+ Entry Pasien Baru</button>`
         : '';
 
@@ -400,15 +410,22 @@ function renderList() {
                         <span class="search-icon">🔍</span>
                         <input type="text" placeholder="Cari No RM / Nama Pasien..." value="${state.searchQuery}" oninput="updateState({searchQuery: this.value, currentPage: 1})">
                     </div>
-                    <div class="filter-box">
-                        <input type="date" class="form-input filter-input" value="${state.filterDate || ''}" onchange="updateState({filterDate: this.value, currentPage: 1})" title="Filter Tanggal">
-                        <select class="form-select filter-select" onchange="updateState({filterStatus: this.value, currentPage: 1})">
-                            <option value="">Semua Status</option>
-                            <option value="dipantau" ${state.filterStatus === 'dipantau' ? 'selected' : ''}>Telah Dipantau</option>
-                            <option value="menunggu" ${state.filterStatus === 'menunggu' ? 'selected' : ''}>Menunggu Pemantauan</option>
-                        </select>
+                    <div class="filter-box" style="display:flex; gap:0.5rem; align-items:center;">
+                        ${(state.role === 'superadmin' || state.role === 'dinkes') ? `
+                            <span style="font-size:0.85rem; color:var(--text-secondary);">Filter Tanggal:</span>
+                            <input type="date" class="form-input filter-input" value="${state.filterStartDate || ''}" onchange="updateState({filterStartDate: this.value, currentPage: 1})" title="Tanggal Mulai">
+                            <span style="font-size:0.85rem; color:var(--text-secondary);">-</span>
+                            <input type="date" class="form-input filter-input" value="${state.filterEndDate || ''}" onchange="updateState({filterEndDate: this.value, currentPage: 1})" title="Tanggal Akhir">
+                            <button class="btn-action" style="background-color: #f1f5f9; color: #475569;" onclick="updateState({filterStartDate: '', filterEndDate: '', currentPage: 1})">Reset</button>
+                        ` : ''}
                     </div>
                     ${newBtn}
+                    ${(state.role === 'superadmin' || state.role === 'dinkes') ? `
+                        <div style="display:flex; gap:0.5rem; margin-left:auto;">
+                            <button class="btn-primary" style="background-color:#dc2626; border-color:#b91c1c;" onclick="exportToPDF()">📄 Export PDF</button>
+                            <button class="btn-primary" style="background-color:#16a34a; border-color:#15803d;" onclick="exportToExcel()">📊 Export Excel</button>
+                        </div>
+                    ` : ''}
                 </div>
             <div style="overflow-x: auto;">
                 <table class="data-table">
@@ -437,26 +454,26 @@ function renderPatientDetail() {
     if (!patient) return '';
 
     let timelineHTML = '';
-    
+
     patient.history.forEach((h, idx) => {
         // Determine if it's RSUD admission or Bidan visit
         const isRsud = h.tgl_kunjungan_rs && !h.tgl_kunjungan_bidan;
         const isBidan = !!h.tgl_kunjungan_bidan;
-        
+
         let headerClass = isRsud ? 'theme-blue' : (isBidan ? 'theme-pink' : 'theme-gray');
         let iconClass = isRsud ? 'rsud' : (isBidan ? 'bidan' : 'gray');
         let title = isRsud ? `🏥 Rawat Inap RSUD (${formatDateTime(h.tgl_kunjungan_rs)})` : `🌸 Pemantauan Bidan (${formatDateTime(h.tgl_kunjungan_bidan)})`;
         if (h.tgl_kunjungan_rs && h.tgl_kunjungan_bidan) {
             title = `🏥 Rawat Inap & Pemantauan (${formatDateTime(h.tgl_kunjungan_rs)})`;
         }
-        
+
         let rsudSection = '';
         if (h.tgl_kunjungan_rs) {
             let terapiList = [];
-            if(h.terapi_infus) terapiList.push('Infus');
-            if(h.terapi_antibiotik) terapiList.push('Antibiotik');
-            if(h.terapi_obat_kejang) terapiList.push('Obat Kejang');
-            if(h.terapi_lain) terapiList.push(h.terapi_lain);
+            if (h.terapi_infus) terapiList.push('Infus');
+            if (h.terapi_antibiotik) terapiList.push('Antibiotik');
+            if (h.terapi_obat_kejang) terapiList.push('Obat Kejang');
+            if (h.terapi_lain) terapiList.push(h.terapi_lain);
             let terapiText = terapiList.length > 0 ? terapiList.join(', ') : 'Nihil / Tidak Ada';
 
             rsudSection = `
@@ -473,8 +490,8 @@ function renderPatientDetail() {
             `;
             if (h.foto_rs_1 || h.foto_rs_2) {
                 rsudSection += `<div style="display:flex; gap: 1rem; margin-top: 1rem; margin-bottom: 1rem;">`;
-                if(h.foto_rs_1) rsudSection += `<img src="${h.foto_rs_1}" style="width:100px; height:100px; object-fit:cover; border-radius:8px; border:1px solid #ccc; cursor:pointer;" onclick="window.open('${h.foto_rs_1}')">`;
-                if(h.foto_rs_2) rsudSection += `<img src="${h.foto_rs_2}" style="width:100px; height:100px; object-fit:cover; border-radius:8px; border:1px solid #ccc; cursor:pointer;" onclick="window.open('${h.foto_rs_2}')">`;
+                if (h.foto_rs_1) rsudSection += `<img src="${h.foto_rs_1}" style="width:100px; height:100px; object-fit:cover; border-radius:8px; border:1px solid #ccc; cursor:pointer;" onclick="window.open('${h.foto_rs_1}')">`;
+                if (h.foto_rs_2) rsudSection += `<img src="${h.foto_rs_2}" style="width:100px; height:100px; object-fit:cover; border-radius:8px; border:1px solid #ccc; cursor:pointer;" onclick="window.open('${h.foto_rs_2}')">`;
                 rsudSection += `</div>`;
             }
             if (h.nama_petugas_rs || h.kontak_petugas_rs) {
@@ -508,8 +525,8 @@ function renderPatientDetail() {
             `;
             if (h.foto_bidan_1 || h.foto_bidan_2) {
                 bidanSection += `<div style="display:flex; gap: 1rem; margin-top: 1rem;">`;
-                if(h.foto_bidan_1) bidanSection += `<img src="${h.foto_bidan_1}" style="width:100px; height:100px; object-fit:cover; border-radius:8px; border:1px solid #ccc; cursor:pointer;" onclick="window.open('${h.foto_bidan_1}')">`;
-                if(h.foto_bidan_2) bidanSection += `<img src="${h.foto_bidan_2}" style="width:100px; height:100px; object-fit:cover; border-radius:8px; border:1px solid #ccc; cursor:pointer;" onclick="window.open('${h.foto_bidan_2}')">`;
+                if (h.foto_bidan_1) bidanSection += `<img src="${h.foto_bidan_1}" style="width:100px; height:100px; object-fit:cover; border-radius:8px; border:1px solid #ccc; cursor:pointer;" onclick="window.open('${h.foto_bidan_1}')">`;
+                if (h.foto_bidan_2) bidanSection += `<img src="${h.foto_bidan_2}" style="width:100px; height:100px; object-fit:cover; border-radius:8px; border:1px solid #ccc; cursor:pointer;" onclick="window.open('${h.foto_bidan_2}')">`;
                 bidanSection += `</div>`;
             }
             if (h.nama_bidan || h.kontak_bidan) {
@@ -599,8 +616,8 @@ function createCheckbox(label, id, checked, disabled = false) {
 function createUploadBox(fieldPrefix, disabled) {
     const f = state.formData;
     const value = f[fieldPrefix];
-    const hasFile = value || f[fieldPrefix+'_name'];
-    
+    const hasFile = value || f[fieldPrefix + '_name'];
+
     return `
         <div class="upload-area ${hasFile ? 'has-file' : ''}" id="box-${fieldPrefix}">
             <input type="file" accept="image/*" class="file-input" ${disabled ? 'disabled' : ''} onchange="handleFileUpload(event, '${fieldPrefix}')">
@@ -620,7 +637,7 @@ function createUploadBox(fieldPrefix, disabled) {
 function renderForm() {
     const isBidan = state.role === 'bidan';
     const isDinkes = state.role === 'dinkes';
-    
+
     const lockRsudFields = state.role === 'bidan' || state.role === 'dinkes';
     const lockBidanFields = state.role === 'rsud' || state.role === 'dinkes';
     const f = state.formData;
@@ -795,27 +812,45 @@ function renderForm() {
 }
 
 // --- 5. EVENT HANDLERS ---
-window.newPatient = function() {
+window.newPatient = function () {
     // Generate nomor RM otomatis, misal "RM-001"
     const nextNum = state.patients.length + 1;
     const generatedRM = "RM-" + String(nextNum).padStart(3, '0');
-    
+
     updateState({ view: 'form', formData: { ...emptyForm, no: generatedRM }, selectedRm: null });
 };
 
-window.loginSuperAdmin = function() {
-    const pwd = prompt("Masukkan password Superadmin:");
-    if (pwd === "@Nox86") {
-        updateState({ role: 'superadmin', view: 'list', currentPage: 1 });
-    } else if (pwd !== null) {
-        alert("Password salah!");
+window.attemptLogin = function (roleName) {
+    const setting = state.settings.find(s => s.role === roleName);
+
+    // Default fallback if settings not loaded yet
+    let reqPwd = false;
+    let expectedPwd = '';
+    if (setting) {
+        reqPwd = setting.requires_password;
+        expectedPwd = setting.password;
+    } else {
+        if (roleName === 'superadmin') { reqPwd = true; expectedPwd = '@Nox86'; }
+        else if (roleName === 'dinkes') { reqPwd = true; expectedPwd = 'neoGrati321'; }
     }
+
+    if (reqPwd) {
+        const pwd = prompt("Masukkan password untuk akses ini:");
+        if (pwd === null) return; // Cancel
+        if (pwd !== expectedPwd) {
+            alert("Password salah!");
+            return;
+        }
+    }
+
+    const targetView = (roleName === 'superadmin' || roleName === 'dinkes') ? 'dashboard' : 'list';
+    updateState({ role: roleName, view: targetView, currentPage: 1 });
 };
 
-window.exitApp = function() {
+window.exitApp = function () {
     showConfirmModal(
         "🚪",
-        "Keluar Aplikasi?", 
+        "Keluar Aplikasi?",
         "Pastikan semua data sudah terisi dengan benar dan tersimpan sebelum Anda keluar.",
         "Ya, Keluar",
         "btn-danger",
@@ -825,16 +860,16 @@ window.exitApp = function() {
     );
 };
 
-window.viewPatient = function(noRm) {
+window.viewPatient = function (noRm) {
     updateState({ view: 'detail', selectedRm: noRm });
 };
 
-window.addControl = function(sourceRole) {
+window.addControl = function (sourceRole) {
     // Cari pasien dari state.patients
     const patient = state.patients.find(p => p.no === state.selectedRm);
     // Kita copy identitas statis dari row terakhir
     const lastRecord = patient.history[patient.history.length - 1];
-    
+
     // Set ID ke null agar menjadi baris baru (riwayat) di Sheets!
     const newForm = {
         ...emptyForm,
@@ -847,7 +882,7 @@ window.addControl = function(sourceRole) {
     updateState({ view: 'form', formData: newForm });
 };
 
-window.editRecord = function(id) {
+window.editRecord = function (id) {
     const record = state.records.find(r => r.id === id);
     if (record) {
         let formData = { ...record };
@@ -860,15 +895,15 @@ window.editRecord = function(id) {
     }
 };
 
-window.submitForm = async function(e) {
+window.submitForm = async function (e) {
     e.preventDefault();
-    
+
     // Validation
     const form = e.target;
     const inputs = form.querySelectorAll('input:not([type="file"]):not([disabled]):not([type="checkbox"]), select:not([disabled]), textarea:not([disabled])');
     const optionalFields = ['kelainan_kongenital', 'indikasi_ibu', 'diagnosa_rujukan', 'terapi_lain', 'tanda_kegawatan', 'tindakan_kegawatan'];
     let hasError = false;
-    
+
     inputs.forEach(input => {
         input.classList.remove('error-blink');
         if (!optionalFields.includes(input.id) && !input.value.trim()) {
@@ -878,7 +913,7 @@ window.submitForm = async function(e) {
             }
         }
     });
-    
+
     if (hasError && state.role !== 'superadmin') {
         alert("⚠️ Terdapat data wajib yang belum diisi. Mohon periksa kolom yang berkedip merah.");
         return;
@@ -889,13 +924,13 @@ window.submitForm = async function(e) {
     }
 
     updateState({ isSubmitting: true });
-    
+
     const payload = { ...state.formData };
 
     try {
-        const response = await fetch(scriptURL, { 
-            method: 'POST', 
-            body: JSON.stringify(payload) 
+        const response = await fetch(scriptURL, {
+            method: 'POST',
+            body: JSON.stringify(payload)
         });
         const result = await response.json();
 
@@ -915,7 +950,7 @@ window.submitForm = async function(e) {
     }
 };
 
-window.showRujukanModal = function(noRm) {
+window.showRujukanModal = function (noRm) {
     const patient = state.patients.find(p => p.no === noRm);
     if (!patient) return;
 
@@ -944,7 +979,7 @@ window.showRujukanModal = function(noRm) {
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 };
 
-window.simpanRujukan = async function(noRm) {
+window.simpanRujukan = async function (noRm) {
     const patient = state.patients.find(p => p.no === noRm);
     if (!patient || patient.history.length === 0) return;
 
@@ -966,9 +1001,9 @@ window.simpanRujukan = async function(noRm) {
     btnSimpan.disabled = true;
 
     try {
-        const response = await fetch(scriptURL, { 
-            method: 'POST', 
-            body: JSON.stringify(lastRecord) 
+        const response = await fetch(scriptURL, {
+            method: 'POST',
+            body: JSON.stringify(lastRecord)
         });
         const result = await response.json();
 
@@ -995,19 +1030,20 @@ async function loadData() {
     try {
         const res = await fetch(scriptURL);
         const json = await res.json();
-        if(json.status === 'success') {
+        if (json.status === 'success') {
+            if (json.settings) state.settings = json.settings;
             processRecords(json.data);
         }
-    } catch(e) {
+    } catch (e) {
         console.error('Failed to load data', e);
         // If it fails (CORS, offline), start empty
         processRecords([]);
     }
 }
 
-window.initApp = async function() {
+window.initApp = async function () {
     renderApp(); // Render loading state
-    
+
     await loadData();
     updateState({ isLoading: false });
 
@@ -1021,7 +1057,7 @@ window.initApp = async function() {
 
 function renderApp() {
     const app = document.getElementById('app');
-    
+
     if (state.isLoading) {
         app.innerHTML = `<div style="text-align:center; padding: 5rem; color: #666;">Sedang Memuat Data...</div>`;
         return;
@@ -1034,22 +1070,395 @@ function renderApp() {
         html += renderHeader();
         if (state.view === 'list') {
             html += renderList();
+        } else if (state.view === 'dashboard') {
+            html += renderDashboard();
         } else if (state.view === 'detail') {
             html += renderPatientDetail();
         } else {
             html += renderForm();
         }
     }
-    
+
     html += `
         <div style="text-align: center; margin-top: 2rem; padding-bottom: 2rem; font-size: 0.8rem; color: var(--text-tertiary);">
             Ada Kendala Teknis atau Perlu Koreksi Data? Hubungi Super Admin | design by <a href="https://wa.me/6281233249944" target="_blank" style="color: inherit; text-decoration: underline; font-weight: 600;">nox86</a>
         </div>
     `;
-    
+
     html += `</div>`;
-    
+
     app.innerHTML = html;
+
+    if (state.view === 'dashboard') {
+        setTimeout(initDashboardCharts, 50);
+    }
+}
+
+window.exportToPDF = function () {
+    if (typeof jspdf === 'undefined') {
+        alert("Library PDF belum termuat sempurna. Silakan muat ulang halaman.");
+        return;
+    }
+
+    // Ambil data yang tersaring
+    let filtered = state.patients.filter(p =>
+        p.nama_pasien.toLowerCase().includes(state.searchQuery.toLowerCase()) ||
+        p.no.toLowerCase().includes(state.searchQuery.toLowerCase())
+    );
+    if (state.filterStartDate && state.filterEndDate) {
+        const start = new Date(state.filterStartDate).getTime();
+        const end = new Date(state.filterEndDate).setHours(23, 59, 59, 999);
+        filtered = filtered.filter(p => p.history.some(h => {
+            const dateRS = new Date(h.tgl_kunjungan_rs).getTime();
+            const dateBidan = new Date(h.tgl_kunjungan_bidan).getTime();
+            return (!isNaN(dateRS) && dateRS >= start && dateRS <= end) ||
+                (!isNaN(dateBidan) && dateBidan >= start && dateBidan <= end);
+        }));
+    }
+    if (state.role === 'faskes_rujukan') filtered = filtered.filter(p => p.is_dirujuk === true);
+
+    const doc = new jspdf.jsPDF({ orientation: "landscape", format: "f4" });
+
+    doc.setFontSize(16);
+    doc.text("Laporan Pasien NEO-LINK RSUD GRATI", 14, 20);
+    doc.setFontSize(10);
+    let subtitle = "Semua Tanggal";
+    if (state.filterStartDate && state.filterEndDate) {
+        subtitle = `Periode: ${state.filterStartDate} s/d ${state.filterEndDate}`;
+    }
+    doc.text(subtitle, 14, 28);
+
+    const tableData = filtered.map((p, idx) => {
+        const lastRecord = p.history[p.history.length - 1];
+        let kondisi = lastRecord.tgl_kunjungan_bidan ? lastRecord.hasil : (lastRecord.kondisi_krs || 'Selesai Rawat');
+        let rujukan = p.is_dirujuk ? `Dirujuk: ${p.lokasi_rujukan_lanjutan}` : '-';
+        return [
+            idx + 1,
+            p.no,
+            p.nama_pasien,
+            formatForDateInput(p.tgl_lahir),
+            lastRecord.diagnosa_akhir || lastRecord.diagnosa_awal || '-',
+            kondisi,
+            rujukan
+        ];
+    });
+
+    doc.autoTable({
+        startY: 35,
+        head: [['No', 'No RM', 'Nama Pasien', 'Tgl Lahir', 'Diagnosa Terakhir', 'Kondisi Akhir', 'Status Rujukan']],
+        body: tableData,
+        theme: 'striped',
+        styles: { fontSize: 9 },
+        headStyles: { fillColor: [30, 58, 138] }
+    });
+
+    doc.save(`Laporan_NEO_LINK_${new Date().getTime()}.pdf`);
+};
+
+window.exportToExcel = function () {
+    if (typeof XLSX === 'undefined') {
+        alert("Library Excel belum termuat sempurna. Silakan muat ulang halaman.");
+        return;
+    }
+
+    let filtered = state.patients.filter(p => p.nama_pasien.toLowerCase().includes(state.searchQuery.toLowerCase()) || p.no.toLowerCase().includes(state.searchQuery.toLowerCase()));
+    if (state.filterStartDate && state.filterEndDate) {
+        const start = new Date(state.filterStartDate).getTime();
+        const end = new Date(state.filterEndDate).setHours(23, 59, 59, 999);
+        filtered = filtered.filter(p => p.history.some(h => {
+            const dateRS = new Date(h.tgl_kunjungan_rs).getTime();
+            const dateBidan = new Date(h.tgl_kunjungan_bidan).getTime();
+            return (!isNaN(dateRS) && dateRS >= start && dateRS <= end) || (!isNaN(dateBidan) && dateBidan >= start && dateBidan <= end);
+        }));
+    }
+    if (state.role === 'faskes_rujukan') filtered = filtered.filter(p => p.is_dirujuk === true);
+
+    const data = filtered.map((p, idx) => {
+        const last = p.history[p.history.length - 1];
+        return {
+            "No": idx + 1,
+            "No RM": p.no,
+            "Nama Pasien": p.nama_pasien,
+            "Tanggal Lahir": formatForDateInput(p.tgl_lahir),
+            "Jenis Kelamin": last.jenis_kelamin || '-',
+            "Diagnosa Akhir": last.diagnosa_akhir || '-',
+            "Kondisi KRS": last.kondisi_krs || '-',
+            "Hasil Pemantauan Bidan": last.hasil || '-',
+            "Status Rujukan Lanjutan": p.is_dirujuk ? "YA" : "TIDAK",
+            "Lokasi Rujukan": p.lokasi_rujukan_lanjutan || '-'
+        };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Data Pasien");
+    XLSX.writeFile(workbook, `Laporan_NEO_LINK_${new Date().getTime()}.xlsx`);
+};
+
+window.showAccountManager = function () {
+    const roles = ['rsud', 'bidan', 'dinkes', 'superadmin', 'faskes_rujukan'];
+    const roleLabels = {
+        'rsud': 'Admin Faskes / RS',
+        'bidan': 'Bidan Pemantau',
+        'dinkes': 'Pengawas (Dinkes)',
+        'superadmin': 'Superadmin',
+        'faskes_rujukan': 'Faskes Rujukan Lanjutan'
+    };
+
+    let rowsHtml = roles.map(r => {
+        const set = state.settings.find(s => s.role === r) || { requires_password: false, password: '' };
+        return `
+            <tr>
+                <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;"><strong>${roleLabels[r]}</strong><input type="hidden" class="set-role" value="${r}"></td>
+                <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align:center;">
+                    <select class="form-select set-req" onchange="document.getElementById('pwd-${r}').disabled = (this.value === 'TIDAK')" style="width: auto;">
+                        <option value="YA" ${set.requires_password ? 'selected' : ''}>YA</option>
+                        <option value="TIDAK" ${!set.requires_password ? 'selected' : ''}>TIDAK</option>
+                    </select>
+                </td>
+                <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">
+                    <input type="text" class="form-input set-pwd" id="pwd-${r}" value="${set.password}" ${!set.requires_password ? 'disabled' : ''} placeholder="Masukkan password">
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    const modalHtml = `
+        <div id="account-modal" class="modal-overlay fade-in" style="z-index: 1000;">
+            <div class="modal-content scale-in" style="max-width: 600px; text-align: left; width: 90%;">
+                <h3 class="modal-title" style="margin-bottom: 1rem;">⚙️ Manajemen Akun & Password</h3>
+                <p style="margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.9rem;">
+                    Atur kewajiban password dan ubah kata sandi untuk masing-masing peran pengguna di sini.
+                </p>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: #f8fafc; text-align: left;">
+                                <th style="padding: 10px; border-bottom: 2px solid #e2e8f0;">Peran (Role)</th>
+                                <th style="padding: 10px; border-bottom: 2px solid #e2e8f0; text-align:center;">Perlu Password?</th>
+                                <th style="padding: 10px; border-bottom: 2px solid #e2e8f0;">Password</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHtml}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="modal-actions" style="margin-top: 1.5rem; justify-content: flex-end;">
+                    <button class="btn-cancel" onclick="document.getElementById('account-modal').remove()">Batal</button>
+                    <button class="btn-primary" onclick="saveAccountSettings()">Simpan Pengaturan</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+};
+
+window.saveAccountSettings = async function () {
+    const modal = document.getElementById('account-modal');
+    const roleInputs = modal.querySelectorAll('.set-role');
+    const reqInputs = modal.querySelectorAll('.set-req');
+    const pwdInputs = modal.querySelectorAll('.set-pwd');
+
+    let newSettings = [];
+    for (let i = 0; i < roleInputs.length; i++) {
+        const role = roleInputs[i].value;
+        const req = reqInputs[i].value;
+        const pwd = pwdInputs[i].value.trim();
+
+        if (req === 'YA' && !pwd) {
+            alert(`Password untuk ${role} tidak boleh kosong jika diwajibkan!`);
+            return;
+        }
+
+        newSettings.push([role, req, req === 'YA' ? pwd : '']);
+    }
+
+    const btn = modal.querySelector('.btn-primary');
+    btn.textContent = "Menyimpan...";
+    btn.disabled = true;
+
+    try {
+        const response = await fetch(scriptURL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'update_settings', settings: newSettings })
+        });
+        const result = await response.json();
+        if (result.status === 'success') {
+            alert("✅ Pengaturan akun berhasil disimpan.");
+            document.getElementById('account-modal').remove();
+            await loadData(); // Reload settings
+        } else {
+            alert("❌ Gagal menyimpan: " + result.message);
+            btn.textContent = "Simpan Pengaturan";
+            btn.disabled = false;
+        }
+    } catch (e) {
+        alert("❌ Terjadi kesalahan jaringan.");
+        btn.textContent = "Simpan Pengaturan";
+        btn.disabled = false;
+    }
+};
+
+// --- DASHBOARD FUNCTIONS ---
+function renderDashboard() {
+    return `
+        <div class="fade-in dashboard-container">
+            <div class="dashboard-toolbar" style="display: flex; gap: 1rem; align-items: center; margin-bottom: 2rem; background: white; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); flex-wrap: wrap;">
+                <span style="font-weight: 600; font-size: 1.1rem; color: var(--text-main);">Filter Statistik:</span>
+                <select class="form-select" style="width: auto;" onchange="updateState({dashboardMonth: this.value})">
+                    <option value="all" ${state.dashboardMonth === 'all' ? 'selected' : ''}>Semua Bulan</option>
+                    <option value="0" ${state.dashboardMonth == '0' ? 'selected' : ''}>Januari</option>
+                    <option value="1" ${state.dashboardMonth == '1' ? 'selected' : ''}>Februari</option>
+                    <option value="2" ${state.dashboardMonth == '2' ? 'selected' : ''}>Maret</option>
+                    <option value="3" ${state.dashboardMonth == '3' ? 'selected' : ''}>April</option>
+                    <option value="4" ${state.dashboardMonth == '4' ? 'selected' : ''}>Mei</option>
+                    <option value="5" ${state.dashboardMonth == '5' ? 'selected' : ''}>Juni</option>
+                    <option value="6" ${state.dashboardMonth == '6' ? 'selected' : ''}>Juli</option>
+                    <option value="7" ${state.dashboardMonth == '7' ? 'selected' : ''}>Agustus</option>
+                    <option value="8" ${state.dashboardMonth == '8' ? 'selected' : ''}>September</option>
+                    <option value="9" ${state.dashboardMonth == '9' ? 'selected' : ''}>Oktober</option>
+                    <option value="10" ${state.dashboardMonth == '10' ? 'selected' : ''}>November</option>
+                    <option value="11" ${state.dashboardMonth == '11' ? 'selected' : ''}>Desember</option>
+                </select>
+                <select class="form-select" style="width: auto;" onchange="updateState({dashboardYear: this.value})">
+                    ${[0, 1, 2, 3, 4].map(offset => {
+        const yr = new Date().getFullYear() - offset;
+        return '<option value="' + yr + '" ' + (state.dashboardYear == yr ? 'selected' : '') + '>' + yr + '</option>';
+    }).join('')}
+                </select>
+                <div style="margin-left: auto; font-size: 1.2rem; font-weight: bold; color: #1e3a8a; background: #eff6ff; padding: 0.5rem 1rem; border-radius: 8px;">
+                    Total Pasien: <span id="dash-total" style="font-size: 1.5rem; color: #3b82f6;">0</span>
+                </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
+                <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+                    <h3 style="text-align: center; margin-bottom: 1rem; color: var(--text-main);">Jenis Kelamin</h3>
+                    <div style="position: relative; height: 250px;"><canvas id="chart-jk"></canvas></div>
+                </div>
+                <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+                    <h3 style="text-align: center; margin-bottom: 1rem; color: var(--text-main);">Cara Lahir</h3>
+                    <div style="position: relative; height: 250px;"><canvas id="chart-lahir"></canvas></div>
+                </div>
+                <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+                    <h3 style="text-align: center; margin-bottom: 1rem; color: var(--text-main);">Pasang Alat Nafas (RSUD)</h3>
+                    <div style="position: relative; height: 250px;"><canvas id="chart-alat"></canvas></div>
+                </div>
+                <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+                    <h3 style="text-align: center; margin-bottom: 1rem; color: var(--text-main);">Kondisi Keluar RS (KRS)</h3>
+                    <div style="position: relative; height: 250px;"><canvas id="chart-krs"></canvas></div>
+                </div>
+                <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); grid-column: 1 / -1; max-width: 600px; margin: 0 auto; width: 100%;">
+                    <h3 style="text-align: center; margin-bottom: 1rem; color: var(--text-main);">Pasien Dirujuk Lanjutan</h3>
+                    <div style="position: relative; height: 250px;"><canvas id="chart-rujukan"></canvas></div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+let dashCharts = {};
+function initDashboardCharts() {
+    if (typeof Chart === 'undefined') {
+        setTimeout(initDashboardCharts, 200);
+        return;
+    }
+
+    // Filter patients
+    let patients = state.patients;
+    if (state.dashboardYear) {
+        patients = patients.filter(p => {
+            const refDateStr = p.tgl_lahir || p.latest_krs;
+            if (!refDateStr) return false;
+            const d = new Date(refDateStr);
+            if (isNaN(d.getTime())) return false;
+
+            if (d.getFullYear() != state.dashboardYear) return false;
+            if (state.dashboardMonth !== 'all' && d.getMonth() != state.dashboardMonth) return false;
+
+            return true;
+        });
+    }
+
+    const totalEl = document.getElementById('dash-total');
+    if (totalEl) totalEl.textContent = patients.length;
+
+    // Aggregate Data
+    let jkCount = { 'Laki-laki': 0, 'Perempuan': 0, 'Ambiguous': 0 };
+    let lahirCount = {};
+    let alatCount = { 'T-Peace': 0, 'O2 Nasal': 0, 'CPAP/NIV': 0, 'Venti': 0, 'Nihil': 0 };
+    let krsCount = {};
+    let rujukCount = { 'Ya': 0, 'Tidak': 0 };
+
+    patients.forEach(p => {
+        // JK
+        const last = p.history[p.history.length - 1];
+        if (last.jenis_kelamin && last.jenis_kelamin.includes('L')) jkCount['Laki-laki']++;
+        else if (last.jenis_kelamin && last.jenis_kelamin.includes('P')) jkCount['Perempuan']++;
+        else if (last.jenis_kelamin) jkCount['Ambiguous']++;
+
+        // Cara Lahir
+        const lahir = last.cara_lahir || 'Tidak Diketahui';
+        lahirCount[lahir] = (lahirCount[lahir] || 0) + 1;
+
+        // Alat (Check if any history had alat)
+        let hasAlat = false;
+        p.history.forEach(h => {
+            if (h.alat_tpeace) { alatCount['T-Peace']++; hasAlat = true; }
+            if (h.alat_o2nasal) { alatCount['O2 Nasal']++; hasAlat = true; }
+            if (h.alat_cpap) { alatCount['CPAP/NIV']++; hasAlat = true; }
+            if (h.alat_venti) { alatCount['Venti']++; hasAlat = true; }
+        });
+        if (!hasAlat) alatCount['Nihil']++;
+
+        // KRS
+        const krs = last.kondisi_krs || 'Belum KRS';
+        let groupKrs = 'Lainnya';
+        if (krs.includes('HIDUP')) groupKrs = 'HIDUP';
+        else if (krs.includes('MENINGGAL')) groupKrs = 'MENINGGAL';
+        else groupKrs = krs;
+        krsCount[groupKrs] = (krsCount[groupKrs] || 0) + 1;
+
+        // Rujukan
+        if (p.is_dirujuk) rujukCount['Ya']++;
+        else rujukCount['Tidak']++;
+    });
+
+    // Helper to draw/update charts
+    const createOrUpdate = (id, type, labels, data, colors) => {
+        const ctx = document.getElementById(id);
+        if (!ctx) return;
+        if (dashCharts[id]) {
+            dashCharts[id].data.labels = labels;
+            dashCharts[id].data.datasets[0].data = data;
+            dashCharts[id].update();
+        } else {
+            dashCharts[id] = new Chart(ctx, {
+                type: type,
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: colors,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: type === 'pie' || type === 'doughnut' ? 'right' : 'bottom' } },
+                    scales: (type === 'bar') ? { y: { beginAtZero: true, ticks: { stepSize: 1 } } } : {}
+                }
+            });
+        }
+    };
+
+    createOrUpdate('chart-jk', 'doughnut', Object.keys(jkCount), Object.values(jkCount), ['#3b82f6', '#ec4899', '#f59e0b']);
+    createOrUpdate('chart-lahir', 'bar', Object.keys(lahirCount), Object.values(lahirCount), ['#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#64748b']);
+    createOrUpdate('chart-alat', 'bar', Object.keys(alatCount), Object.values(alatCount), ['#6366f1', '#06b6d4', '#14b8a6', '#f43f5e', '#94a3b8']);
+    createOrUpdate('chart-krs', 'pie', Object.keys(krsCount), Object.values(krsCount), ['#10b981', '#ef4444', '#f59e0b', '#64748b']);
+    createOrUpdate('chart-rujukan', 'doughnut', Object.keys(rujukCount), Object.values(rujukCount), ['#ef4444', '#10b981']);
 }
 
 function startClock() {
@@ -1059,15 +1468,15 @@ function startClock() {
             const now = new Date();
             const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
             const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-            
+
             const dayName = days[now.getDay()];
             const date = String(now.getDate()).padStart(2, '0');
             const monthName = months[now.getMonth()];
             const year = now.getFullYear();
-            
+
             const hours = String(now.getHours()).padStart(2, '0');
             const minutes = String(now.getMinutes()).padStart(2, '0');
-            
+
             clockEl.textContent = `⏱️ ${dayName}, ${date} ${monthName} ${year} | Pukul ${hours}:${minutes} WIB`;
         }
     }, 1000);
