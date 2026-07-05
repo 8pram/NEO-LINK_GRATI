@@ -4,8 +4,8 @@
 
 // --- 1. STATE MANAGEMENT ---
 const state = {
-    role: 'bidan', // 'rsud' or 'bidan' or 'dinkes'
-    view: 'list',  // 'list', 'detail', 'form'
+    role: null, // 'rsud' or 'bidan' or 'dinkes' or 'superadmin'
+    view: 'login',  // 'login', 'list', 'detail', 'form'
     records: [],   // All raw records from Google Sheet
     patients: [],  // Grouped by No RM
     selectedRm: null,
@@ -39,6 +39,32 @@ const emptyForm = {
 function updateState(newState) {
     Object.assign(state, newState);
     renderApp();
+}
+
+function formatDateTime(dateStr) {
+    if (!dateStr) return '-';
+    let d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+
+    return `${day}-${month}-${year}, ${hours}:${minutes} WIB`;
+}
+
+function formatForDateTimeInput(dateStr) {
+    if (!dateStr) return '';
+    let d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
 function handleInput(field, value, isCheckbox = false) {
@@ -135,28 +161,49 @@ function processRecords(rawRecords) {
 
 // --- 3. RENDERERS ---
 
+function renderLogin() {
+    return `
+        <div class="login-container fade-in" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh;">
+            <div style="text-align: center; margin-bottom: 2rem;">
+                <h1 style="font-size: 2.5rem; margin-bottom: 0.5rem; color: var(--text-main);">Selamat Datang</h1>
+                <p style="color: var(--text-secondary); font-size: 1.1rem;">Silakan pilih peran Anda untuk masuk ke sistem MOMS-LINK</p>
+            </div>
+            <div class="role-cards" style="display: flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center; max-width: 800px;">
+                <button class="btn-role rsud" style="padding: 1.5rem 2rem; font-size: 1.2rem; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; border-radius: 12px;" onclick="updateState({role: 'rsud', view: 'list', currentPage: 1})">
+                    <span style="font-size: 2rem;">🏥</span> Admin Faskes / RS
+                </button>
+                <button class="btn-role bidan" style="padding: 1.5rem 2rem; font-size: 1.2rem; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; border-radius: 12px;" onclick="updateState({role: 'bidan', view: 'list', currentPage: 1})">
+                    <span style="font-size: 2rem;">🌸</span> Bidan Pemantau
+                </button>
+                <button class="btn-role dinkes" style="padding: 1.5rem 2rem; font-size: 1.2rem; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; border-radius: 12px;" onclick="updateState({role: 'dinkes', view: 'list', currentPage: 1})">
+                    <span style="font-size: 2rem;">👁️</span> Pengawas (Dinkes)
+                </button>
+                <button class="btn-role superadmin" style="padding: 1.5rem 2rem; font-size: 1.2rem; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; border-radius: 12px;" onclick="loginSuperAdmin()">
+                    <span style="font-size: 2rem;">🛡️</span> Superadmin
+                </button>
+            </div>
+        </div>
+    `;
+}
+
 function renderHeader() {
+    let roleText = '';
+    if(state.role === 'rsud') roleText = '🏥 Admin Faskes / RS';
+    else if(state.role === 'bidan') roleText = '🌸 Bidan Pemantau';
+    else if(state.role === 'dinkes') roleText = '👁️ Pengawas (Dinkes)';
+    else if(state.role === 'superadmin') roleText = '🛡️ Superadmin';
+
     return `
         <div class="app-header fade-in">
             <div class="header-title">
                 <h1>Sistem Terintegrasi <span class="${state.role}">MOMS-LINK</span></h1>
                 <p>Midwifery Online Monitoring System - Link</p>
             </div>
-            <div class="role-switcher">
-                <span>Login sebagai ?</span>
-                <button class="btn-role rsud ${state.role === 'rsud' ? 'active' : ''}" onclick="updateState({role: 'rsud', view: 'list', currentPage: 1})">
-                    🏥 Admin Faskes / RS
-                </button>
-                <button class="btn-role bidan ${state.role === 'bidan' ? 'active' : ''}" onclick="updateState({role: 'bidan', view: 'list', currentPage: 1})">
-                    🌸 Bidan Pemantau
-                </button>
-                <button class="btn-role dinkes ${state.role === 'dinkes' ? 'active' : ''}" onclick="updateState({role: 'dinkes', view: 'list', currentPage: 1})">
-                    👁️ Pengawas (Dinkes)
-                </button>
-                <button class="btn-role superadmin ${state.role === 'superadmin' ? 'active' : ''}" onclick="loginSuperAdmin()">
-                    🛡️ Superadmin
-                </button>
-                <button class="btn-role" onclick="exitApp()" style="color: #ef4444; margin-left: auto;">
+            <div class="role-switcher" style="justify-content: flex-end; gap: 1rem;">
+                <span style="font-weight: 500; color: var(--text-secondary); display: flex; align-items: center;">
+                    Login sebagai: <span style="color: var(--text-main); font-weight: 700; margin-left: 0.5rem; padding: 0.25rem 0.75rem; background: var(--bg-main); border-radius: 20px; border: 1px solid var(--border-color);">${roleText}</span>
+                </span>
+                <button class="btn-role" onclick="exitApp()" style="color: #ef4444; border: 1px solid #ef4444; background: rgba(239,68,68,0.1);">
                     🚪 Keluar
                 </button>
             </div>
@@ -291,40 +338,66 @@ function renderPatientDetail() {
         
         let headerClass = isRsud ? 'theme-blue' : (isBidan ? 'theme-pink' : 'theme-gray');
         let iconClass = isRsud ? 'rsud' : (isBidan ? 'bidan' : 'gray');
-        let title = isRsud ? `🏥 Rawat Inap RSUD (${h.tgl_kunjungan_rs})` : `🌸 Pemantauan Bidan (${h.tgl_kunjungan_bidan})`;
+        let title = isRsud ? `🏥 Rawat Inap RSUD (${formatDateTime(h.tgl_kunjungan_rs)})` : `🌸 Pemantauan Bidan (${formatDateTime(h.tgl_kunjungan_bidan)})`;
+        if (h.tgl_kunjungan_rs && h.tgl_kunjungan_bidan) {
+            title = `🏥 Rawat Inap & Pemantauan (${formatDateTime(h.tgl_kunjungan_rs)})`;
+        }
         
-        let content = '';
-        if (isRsud) {
-            content = `
+        let rsudSection = '';
+        if (h.tgl_kunjungan_rs) {
+            let terapiList = [];
+            if(h.terapi_infus) terapiList.push('Infus');
+            if(h.terapi_antibiotik) terapiList.push('Antibiotik');
+            if(h.terapi_obat_kejang) terapiList.push('Obat Kejang');
+            if(h.terapi_lain) terapiList.push(h.terapi_lain);
+            let terapiText = terapiList.length > 0 ? terapiList.join(', ') : 'Nihil / Tidak Ada';
+
+            rsudSection = `
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                    <div><strong>Diagnosa Awal:</strong> ${h.diagnosa_awal}</div>
-                    <div><strong>Diagnosa Akhir:</strong> ${h.diagnosa_akhir}</div>
-                    <div><strong>Kondisi KRS:</strong> ${h.kondisi_krs}</div>
-                    <div><strong>Tindakan:</strong> ${h.terapi_infus ? 'Infus, ' : ''}${h.terapi_antibiotik ? 'Antibiotik, ' : ''}${h.terapi_lain}</div>
+                    <div><strong>Tgl & Jam Masuk:</strong> ${formatDateTime(h.tgl_kunjungan_rs)}</div>
+                    <div><strong>Kelahiran:</strong> ${h.cara_lahir || '-'}, BB: ${h.bb_lahir || '-'}g, UK: ${h.umur_kehamilan || '-'} mgg</div>
+                    <div><strong>Diagnosa Awal:</strong> ${h.diagnosa_awal || '-'}</div>
+                    <div><strong>Diagnosa Akhir:</strong> ${h.diagnosa_akhir || '-'}</div>
+                    <div style="grid-column: 1 / -1;"><strong>Tindakan / Terapi (Tahap 1-4):</strong> ${terapiText}</div>
+                    <div><strong>Rujukan:</strong> ${h.status_rujukan || '-'} ${h.diagnosa_rujukan ? `(${h.diagnosa_rujukan})` : ''}</div>
+                    <div><strong>Tindakan Lanjutan (KRS):</strong> <span class="badge ${h.kondisi_krs && h.kondisi_krs.includes('MENINGGAL') ? 'warning' : 'success'}">${h.kondisi_krs || '-'}</span></div>
+                    <div style="grid-column: 1 / -1;"><strong>Tindakan Lainnya:</strong> PMK: ${h.pmk || '-'} | Minum: ${h.minum || '-'} | Imunisasi: ${h.imunisasi || '-'}</div>
                 </div>
             `;
             if (h.foto_rs_1 || h.foto_rs_2) {
-                content += `<div style="display:flex; gap: 1rem; margin-top: 1rem;">`;
-                if(h.foto_rs_1) content += `<img src="${h.foto_rs_1}" style="width:100px; height:100px; object-fit:cover; border-radius:8px; border:1px solid #ccc;">`;
-                if(h.foto_rs_2) content += `<img src="${h.foto_rs_2}" style="width:100px; height:100px; object-fit:cover; border-radius:8px; border:1px solid #ccc;">`;
-                content += `</div>`;
+                rsudSection += `<div style="display:flex; gap: 1rem; margin-top: 1rem; margin-bottom: 1rem;">`;
+                if(h.foto_rs_1) rsudSection += `<img src="${h.foto_rs_1}" style="width:100px; height:100px; object-fit:cover; border-radius:8px; border:1px solid #ccc; cursor:pointer;" onclick="window.open('${h.foto_rs_1}')">`;
+                if(h.foto_rs_2) rsudSection += `<img src="${h.foto_rs_2}" style="width:100px; height:100px; object-fit:cover; border-radius:8px; border:1px solid #ccc; cursor:pointer;" onclick="window.open('${h.foto_rs_2}')">`;
+                rsudSection += `</div>`;
             }
-        } else {
-            content = `
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                    <div><strong>Keadaan Umum:</strong> ${h.keadaan_umum}</div>
-                    <div><strong>BB / PB:</strong> ${h.bb_kunjungan}g / ${h.pb_kunjungan}cm</div>
-                    <div><strong>Hasil:</strong> ${h.hasil}</div>
-                    <div><strong>Kontrol Selanjutnya:</strong> ${h.kontrol}</div>
+        }
+
+        let bidanSection = '';
+        if (h.tgl_kunjungan_bidan) {
+            bidanSection = `
+                <div style="${h.tgl_kunjungan_rs ? 'border-top: 1px dashed #ccc; padding-top: 1rem; margin-top: 0.5rem;' : ''}">
+                    <h4 style="color: var(--bidan-primary); margin-bottom: 1rem;">🌸 Data Lanjutan (Tahap 5: Pemantauan Bidan)</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div><strong>Tgl & Jam Pantau:</strong> ${formatDateTime(h.tgl_kunjungan_bidan)}</div>
+                        <div><strong>Keadaan Umum:</strong> ${h.keadaan_umum || '-'}</div>
+                        <div><strong>TTV:</strong> Suhu: ${h.suhu || '-'}°C, Nadi: ${h.nadi || '-'}, RR: ${h.pernafasan || '-'}</div>
+                        <div><strong>Pertumbuhan:</strong> BB: ${h.bb_kunjungan || '-'}g, PB: ${h.pb_kunjungan || '-'}cm</div>
+                        <div><strong>Menyusu (Bayi/Ibu):</strong> ${h.kemampuan_menyusu || '-'} / ${h.kemampuan_ibu_menyusui || '-'}</div>
+                        <div><strong>Tanda Kegawatan:</strong> ${h.tanda_kegawatan || '-'} (Tindakan: ${h.tindakan_kegawatan || '-'})</div>
+                        <div><strong>Hasil / Tindakan Lanjutan:</strong> <span class="badge ${h.hasil && (h.hasil.includes('RUJUK') || h.hasil.includes('MENINGGAL')) ? 'warning' : 'success'}">${h.hasil || '-'}</span></div>
+                        <div><strong>Kontrol Selanjutnya:</strong> ${h.kontrol || '-'}</div>
+                    </div>
                 </div>
             `;
             if (h.foto_bidan_1 || h.foto_bidan_2) {
-                content += `<div style="display:flex; gap: 1rem; margin-top: 1rem;">`;
-                if(h.foto_bidan_1) content += `<img src="${h.foto_bidan_1}" style="width:100px; height:100px; object-fit:cover; border-radius:8px; border:1px solid #ccc;">`;
-                if(h.foto_bidan_2) content += `<img src="${h.foto_bidan_2}" style="width:100px; height:100px; object-fit:cover; border-radius:8px; border:1px solid #ccc;">`;
-                content += `</div>`;
+                bidanSection += `<div style="display:flex; gap: 1rem; margin-top: 1rem;">`;
+                if(h.foto_bidan_1) bidanSection += `<img src="${h.foto_bidan_1}" style="width:100px; height:100px; object-fit:cover; border-radius:8px; border:1px solid #ccc; cursor:pointer;" onclick="window.open('${h.foto_bidan_1}')">`;
+                if(h.foto_bidan_2) bidanSection += `<img src="${h.foto_bidan_2}" style="width:100px; height:100px; object-fit:cover; border-radius:8px; border:1px solid #ccc; cursor:pointer;" onclick="window.open('${h.foto_bidan_2}')">`;
+                bidanSection += `</div>`;
             }
         }
+
+        let content = rsudSection + bidanSection;
 
         timelineHTML += `
             <div class="timeline-item fade-in" style="animation-delay: ${idx * 0.1}s">
@@ -450,7 +523,7 @@ function renderForm() {
                             ${createInput('No. Register', 'no_register', 'text', f.no_register, null, lockRsudFields, 'Nomor Register...')}
                             ${createInput('Jenis Kelamin', 'jenis_kelamin', 'text', f.jenis_kelamin, ['Perempuan (P)', 'Laki-laki (L)'], lockRsudFields)}
                             ${createInput('Umur Bayi', 'umur_bayi', 'text', f.umur_bayi, null, lockRsudFields, 'Dalam hari/bulan...')}
-                            ${createInput('Tanggal Kunjungan ke RS', 'tgl_kunjungan_rs', 'date', f.tgl_kunjungan_rs, null, lockRsudFields)}
+                            ${createInput('Tanggal & Jam Kunjungan ke RS', 'tgl_kunjungan_rs', 'datetime-local', formatForDateTimeInput(f.tgl_kunjungan_rs), null, lockRsudFields)}
                             ${createInput('Kelainan Kongenital', 'kelainan_kongenital', 'text', f.kelainan_kongenital, null, lockRsudFields, 'Ada/Tidak, sebutkan...')}
                         </div>
                     </div>
@@ -531,7 +604,7 @@ function renderForm() {
                     <div class="form-card" style="margin-bottom:0; box-shadow:none; border:none;">
                         <div class="card-header ${lockBidanFields ? 'theme-gray' : 'theme-pink'}">🌸 Tahap 5: Pemantauan Bidan</div>
                         <div class="card-body">
-                            ${createInput('Tanggal Kunjungan Bidan', 'tgl_kunjungan_bidan', 'date', f.tgl_kunjungan_bidan, null, lockBidanFields)}
+                            ${createInput('Tanggal & Jam Kunjungan Bidan', 'tgl_kunjungan_bidan', 'datetime-local', formatForDateTimeInput(f.tgl_kunjungan_bidan), null, lockBidanFields)}
                             ${createInput('Berat Badan (Gram)', 'bb_kunjungan', 'number', f.bb_kunjungan, null, lockBidanFields, 'Gram...')}
                             ${createInput('Panjang Badan (Cm)', 'pb_kunjungan', 'number', f.pb_kunjungan, null, lockBidanFields, 'Cm...')}
                             ${createInput('Keadaan Umum', 'keadaan_umum', 'text', f.keadaan_umum, null, lockBidanFields)}
@@ -585,18 +658,8 @@ window.loginSuperAdmin = function() {
 };
 
 window.exitApp = function() {
-    const splash = document.getElementById('splash-screen');
-    const app = document.getElementById('app');
-    if (splash) {
-        // Remove the hidden class so it fades back in
-        splash.style.display = 'flex';
-        // Small delay to allow display:flex to apply before changing opacity
-        setTimeout(() => {
-            splash.classList.remove('hidden');
-            const loader = splash.querySelector('.splash-loader');
-            if (loader) loader.style.display = 'none'; // hide loader on exit
-            app.innerHTML = ''; // Clear the app content
-        }, 50);
+    if (confirm("Anda akan keluar aplikasi? Pastikan data sudah benar dan tersimpan")) {
+        updateState({ role: null, view: 'login' });
     }
 };
 
@@ -718,13 +781,17 @@ function renderApp() {
     }
 
     let html = `<div class="container">`;
-    html += renderHeader();
-    if (state.view === 'list') {
-        html += renderList();
-    } else if (state.view === 'detail') {
-        html += renderPatientDetail();
+    if (state.view === 'login') {
+        html += renderLogin();
     } else {
-        html += renderForm();
+        html += renderHeader();
+        if (state.view === 'list') {
+            html += renderList();
+        } else if (state.view === 'detail') {
+            html += renderPatientDetail();
+        } else {
+            html += renderForm();
+        }
     }
     html += `</div>`;
     
