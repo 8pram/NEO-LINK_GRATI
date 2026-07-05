@@ -835,16 +835,68 @@ window.attemptLogin = function (roleName) {
     }
 
     if (reqPwd) {
-        const pwd = prompt("Masukkan password untuk akses ini:");
-        if (pwd === null) return; // Cancel
-        if (pwd !== expectedPwd) {
-            alert("Password salah!");
-            return;
-        }
+        showPasswordModal(roleName, expectedPwd);
+    } else {
+        const targetView = (roleName === 'superadmin' || roleName === 'dinkes') ? 'dashboard' : 'list';
+        updateState({ role: roleName, view: targetView, currentPage: 1 });
     }
+};
 
-    const targetView = (roleName === 'superadmin' || roleName === 'dinkes') ? 'dashboard' : 'list';
-    updateState({ role: roleName, view: targetView, currentPage: 1 });
+window.showPasswordModal = function (roleName, expectedPwd) {
+    const roleLabels = {
+        'rsud': 'Admin Faskes / RS',
+        'bidan': 'Bidan Pemantau',
+        'dinkes': 'Pengawas (Dinkes)',
+        'superadmin': 'Superadmin',
+        'faskes_rujukan': 'Faskes Rujukan Lanjutan'
+    };
+    const displayRole = roleLabels[roleName] || roleName.toUpperCase();
+
+    const modalHtml = `
+        <div id="pwd-modal" class="modal-overlay fade-in" style="z-index: 1000;">
+            <div class="modal-content scale-in" style="max-width: 400px; text-align: center; border-radius: 16px; padding: 2.5rem 2rem;">
+                <div style="font-size: 3.5rem; margin-bottom: 1rem; line-height: 1;">🔐</div>
+                <h3 class="modal-title" style="margin-bottom: 0.5rem; font-size: 1.4rem; color: #0f172a;">Akses Terbatas</h3>
+                <p style="margin-bottom: 1.5rem; color: #64748b; font-size: 0.95rem;">
+                    Silakan masukkan kata sandi untuk masuk sebagai <br><strong style="color: #3b82f6; font-size: 1.05rem;">${displayRole}</strong>
+                </p>
+                <div class="form-group" style="text-align: left; margin-bottom: 0;">
+                    <input type="password" id="modal-pwd-input" class="form-input" placeholder="Ketik kata sandi..." style="text-align: center; font-size: 1.1rem; padding: 0.75rem; letter-spacing: 2px; border-radius: 8px;">
+                    <div id="pwd-error" style="color: #ef4444; font-size: 0.85rem; margin-top: 0.5rem; display: none; text-align: center; font-weight: 500;">Password salah! Silakan coba lagi.</div>
+                </div>
+                <div class="modal-actions" style="margin-top: 2rem; display: flex; gap: 1rem;">
+                    <button class="btn-cancel" onclick="document.getElementById('pwd-modal').remove()" style="flex: 1; border-radius: 8px; padding: 0.75rem;">Batal</button>
+                    <button class="btn-primary" id="modal-pwd-submit" style="flex: 1; border-radius: 8px; padding: 0.75rem;">Masuk</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    const input = document.getElementById('modal-pwd-input');
+    const submitBtn = document.getElementById('modal-pwd-submit');
+    const errorMsg = document.getElementById('pwd-error');
+
+    input.focus();
+
+    const checkPassword = () => {
+        if (input.value === expectedPwd) {
+            document.getElementById('pwd-modal').remove();
+            const targetView = (roleName === 'superadmin' || roleName === 'dinkes') ? 'dashboard' : 'list';
+            updateState({ role: roleName, view: targetView, currentPage: 1 });
+        } else {
+            errorMsg.style.display = 'block';
+            input.classList.add('error-blink');
+            setTimeout(() => input.classList.remove('error-blink'), 1000);
+            input.value = '';
+            input.focus();
+        }
+    };
+
+    submitBtn.onclick = checkPassword;
+    input.addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') checkPassword();
+    });
 };
 
 window.exitApp = function () {
