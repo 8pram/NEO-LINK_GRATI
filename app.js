@@ -551,7 +551,12 @@ function renderPatientDetail() {
                 <div class="timeline-content" style="border-left: 4px solid var(--${iconClass}-primary);">
                     <div class="timeline-header">
                         <span class="timeline-title">${title}</span>
-                        <button class="btn-action ${iconClass}" onclick="editRecord(${h.id})">Edit</button>
+                        ${state.role === 'superadmin' ? `
+                            <div style="display:flex; gap:0.5rem;">
+                                <button class="btn-action ${iconClass}" onclick="editRecord(${h.id})">Edit</button>
+                                <button class="btn-action" style="background-color: #fee2e2; color: #ef4444; border-color: #ef4444;" onclick="deleteRecord(${h.id})">Hapus</button>
+                            </div>
+                        ` : ''}
                     </div>
                     ${content}
                 </div>
@@ -946,6 +951,39 @@ window.editRecord = function (id) {
             formData.nama_faskes_rujukan = parts.slice(1).join(' - ');
         }
         updateState({ view: 'form', formData: formData });
+    }
+};
+
+window.deleteRecord = async function (id) {
+    if (state.role !== 'superadmin') {
+        alert("Akses ditolak: Hanya Super Admin yang dapat menghapus data.");
+        return;
+    }
+    if (!confirm("⚠️ PERINGATAN: Apakah Anda yakin ingin menghapus catatan rekam medis ini secara permanen? Data yang dihapus tidak dapat dikembalikan.")) {
+        return;
+    }
+    
+    updateState({ isSubmitting: true });
+    
+    try {
+        const response = await fetch(scriptURL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'delete_record', id: id })
+        });
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            alert("✅ " + result.message);
+            await loadData();
+            updateState({ isSubmitting: false, view: state.selectedRm ? 'detail' : 'list' });
+        } else {
+            alert("❌ Gagal menghapus: " + result.message);
+            updateState({ isSubmitting: false });
+        }
+    } catch (error) {
+        console.error('Submit Error:', error);
+        alert("❌ Terjadi kesalahan jaringan. Silakan periksa koneksi internet Anda.");
+        updateState({ isSubmitting: false });
     }
 };
 
