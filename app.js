@@ -388,12 +388,14 @@ function renderList() {
 
             let actionBtns = '';
             if (state.role === 'superadmin') {
-                actionBtns += `
-                <div style="display:flex; flex-direction:column; gap:0.25rem;">
-                    <button class="btn-action" style="background-color: #d1fae5; color: #10b981; border-color: #10b981; padding: 0.25rem 0.5rem; font-size:0.75rem;" onclick="event.stopPropagation(); setPatientStatus('${row.no}', 'Sembuh')">Set Sembuh</button>
-                    <button class="btn-action" style="background-color: #fee2e2; color: #ef4444; border-color: #ef4444; padding: 0.25rem 0.5rem; font-size:0.75rem;" onclick="event.stopPropagation(); showRujukanModal('${row.no}')">Set Dirujuk</button>
-                    <button class="btn-action" style="background-color: #1f2937; color: white; border-color: #1f2937; padding: 0.25rem 0.5rem; font-size:0.75rem;" onclick="event.stopPropagation(); setPatientStatus('${row.no}', 'Meninggal')">Set Meninggal</button>
-                </div>`;
+                if (!row.status_akhir) {
+                    actionBtns += `
+                    <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                        <button class="btn-action" style="background-color: #d1fae5; color: #10b981; border-color: #10b981; padding: 0.25rem 0.5rem; font-size:0.75rem;" onclick="event.stopPropagation(); setPatientStatus('${row.no}', 'Sembuh')">Set Sembuh</button>
+                        <button class="btn-action" style="background-color: #fee2e2; color: #ef4444; border-color: #ef4444; padding: 0.25rem 0.5rem; font-size:0.75rem;" onclick="event.stopPropagation(); showRujukanModal('${row.no}')">Set Dirujuk</button>
+                        <button class="btn-action" style="background-color: #1f2937; color: white; border-color: #1f2937; padding: 0.25rem 0.5rem; font-size:0.75rem;" onclick="event.stopPropagation(); setPatientStatus('${row.no}', 'Meninggal')">Set Meninggal</button>
+                    </div>`;
+                }
             }
 
             tableRows += `

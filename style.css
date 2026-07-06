@@ -876,6 +876,9 @@ input, select {
 .btn-submit.rsud { background-color: var(--rsud-primary); }
 .btn-submit.rsud:hover { background-color: var(--rsud-hover); transform: translateY(-2px); box-shadow: var(--shadow-lg); }
 
+.btn-submit.fktp { background-color: var(--rsud-primary); }
+.btn-submit.fktp:hover { background-color: var(--rsud-hover); transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+
 .btn-submit.bidan { background-color: var(--bidan-primary); }
 .btn-submit.bidan:hover { background-color: var(--bidan-hover); transform: translateY(-2px); box-shadow: var(--shadow-lg); }
 
