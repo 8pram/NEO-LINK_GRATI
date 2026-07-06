@@ -93,6 +93,28 @@ window.showConfirmModal = function (icon, title, message, confirmText, confirmCl
     };
 };
 
+window.showAlertModal = function (icon, title, message, callback = null) {
+    const modalHtml = `
+        <div id="custom-alert-modal" class="modal-overlay fade-in">
+            <div class="modal-content scale-in">
+                <div class="modal-icon">${icon}</div>
+                <h3 class="modal-title">${title}</h3>
+                <p class="modal-message">${message}</p>
+                <div class="modal-actions" style="justify-content: center;">
+                    <button class="btn-primary" id="modal-alert-btn" style="min-width: 120px;">OK</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const btn = document.getElementById('modal-alert-btn');
+    btn.focus();
+    btn.onclick = () => {
+        document.getElementById('custom-alert-modal').remove();
+        if (callback) callback();
+    };
+};
+
 function formatForDateInput(dateStr) {
     if (!dateStr) return '';
     let d = new Date(dateStr);
@@ -184,7 +206,7 @@ window.handleFileUpload = function (event, fieldPrefix) {
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-        alert("Ukuran file terlalu besar! Maksimal 5MB.");
+        showAlertModal("⚠️", "Ukuran File", "Ukuran file terlalu besar! Maksimal 5MB.");
         event.target.value = '';
         return;
     }
@@ -981,11 +1003,22 @@ window.addPerburukan = function () {
 
     const newForm = {
         ...emptyForm,
+        // Tahap 1 (Identitas Tetap)
         no: lastRecord.no,
         nama_pasien: lastRecord.nama_pasien,
         tgl_lahir: lastRecord.tgl_lahir,
         jenis_kelamin: lastRecord.jenis_kelamin,
-        no_register: lastRecord.no_register
+        no_register: lastRecord.no_register,
+        
+        // Tahap 2 (Riwayat Kehamilan & Persalinan Tetap)
+        umur_kehamilan: lastRecord.umur_kehamilan,
+        bb_lahir: lastRecord.bb_lahir,
+        hamil_ke: lastRecord.hamil_ke,
+        jenis_kehamilan: lastRecord.jenis_kehamilan,
+        cara_lahir: lastRecord.cara_lahir,
+        indikasi_ibu: lastRecord.indikasi_ibu,
+        apgar_score: lastRecord.apgar_score,
+        mendapat_resusitasi: lastRecord.mendapat_resusitasi
     };
 
     updateState({ view: 'form', formData: newForm, isPerburukan: true });
@@ -1004,37 +1037,44 @@ window.editRecord = function (id) {
     }
 };
 
-window.deleteRecord = async function (id) {
+window.deleteRecord = function (id) {
     if (state.role !== 'superadmin') {
-        alert("Akses ditolak: Hanya Super Admin yang dapat menghapus data.");
-        return;
-    }
-    if (!confirm("⚠️ PERINGATAN: Apakah Anda yakin ingin menghapus catatan rekam medis ini secara permanen? Data yang dihapus tidak dapat dikembalikan.")) {
+        showAlertModal("⛔", "Akses Ditolak", "Hanya Super Admin yang dapat menghapus data.");
         return;
     }
     
-    updateState({ isSubmitting: true });
-    
-    try {
-        const response = await fetch(scriptURL, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'delete_record', id: id })
-        });
-        const result = await response.json();
-        
-        if (result.status === 'success') {
-            alert("✅ " + result.message);
-            await loadData();
-            updateState({ isSubmitting: false, view: state.selectedRm ? 'detail' : 'list' });
-        } else {
-            alert("❌ Gagal menghapus: " + result.message);
-            updateState({ isSubmitting: false });
+    showConfirmModal(
+        "⚠️", 
+        "Hapus Data Permanen", 
+        "Apakah Anda yakin ingin menghapus catatan rekam medis ini secara permanen? Data yang dihapus tidak dapat dikembalikan.", 
+        "Ya, Hapus", 
+        "btn-danger", 
+        async () => {
+            updateState({ isSubmitting: true });
+            
+            try {
+                const response = await fetch(scriptURL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'delete_record', id: id })
+                });
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    showAlertModal("✅", "Berhasil", result.message, async () => {
+                        await loadData();
+                        updateState({ isSubmitting: false, view: state.selectedRm ? 'detail' : 'list' });
+                    });
+                } else {
+                    showAlertModal("❌", "Gagal Menghapus", result.message);
+                    updateState({ isSubmitting: false });
+                }
+            } catch (error) {
+                console.error('Submit Error:', error);
+                showAlertModal("📡", "Gangguan Jaringan", "Terjadi kesalahan jaringan. Silakan periksa koneksi internet Anda.");
+                updateState({ isSubmitting: false });
+            }
         }
-    } catch (error) {
-        console.error('Submit Error:', error);
-        alert("❌ Terjadi kesalahan jaringan. Silakan periksa koneksi internet Anda.");
-        updateState({ isSubmitting: false });
-    }
+    );
 };
 
 window.submitForm = async function (e) {
@@ -1057,39 +1097,44 @@ window.submitForm = async function (e) {
     });
 
     if (hasError && state.role !== 'superadmin') {
-        alert("⚠️ Terdapat data wajib yang belum diisi. Mohon periksa kolom yang berkedip merah.");
+        showAlertModal("⚠️", "Data Belum Lengkap", "Terdapat data wajib yang belum diisi. Mohon periksa kolom yang berkedip merah.");
         return;
     }
 
-    if (!confirm("Apakah data yang Anda input sudah benar?\n\nPilih 'OK/Simpan' untuk mengirim, atau 'Batal' untuk mengecek kembali.")) {
-        return;
-    }
+    showConfirmModal(
+        "📝", 
+        "Konfirmasi Simpan", 
+        "Apakah data yang Anda input sudah benar?<br><br>Pilih 'Ya, Simpan' untuk mengirim, atau 'Batal' untuk mengecek kembali.", 
+        "Ya, Simpan", 
+        "btn-primary-modal", 
+        async () => {
+            updateState({ isSubmitting: true });
 
-    updateState({ isSubmitting: true });
+            const payload = { ...state.formData };
 
-    const payload = { ...state.formData };
+            try {
+                const response = await fetch(scriptURL, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
 
-    try {
-        const response = await fetch(scriptURL, {
-            method: 'POST',
-            body: JSON.stringify(payload)
-        });
-        const result = await response.json();
-
-        if (result.status === 'success') {
-            alert("✅ " + result.message);
-            // Refresh data from server to ensure accuracy
-            await loadData();
-            updateState({ isSubmitting: false, view: state.selectedRm ? 'detail' : 'list' });
-        } else {
-            alert("❌ Terjadi kesalahan pada server: " + result.message);
-            updateState({ isSubmitting: false });
+                if (result.status === 'success') {
+                    showAlertModal("✅", "Berhasil", result.message, async () => {
+                        await loadData();
+                        updateState({ isSubmitting: false, view: state.selectedRm ? 'detail' : 'list' });
+                    });
+                } else {
+                    showAlertModal("❌", "Gagal Disimpan", "Terjadi kesalahan pada server: " + result.message);
+                    updateState({ isSubmitting: false });
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                showAlertModal("📡", "Gangguan Jaringan", "Gagal mengirim data. Pastikan koneksi internet Anda stabil.");
+                updateState({ isSubmitting: false });
+            }
         }
-    } catch (error) {
-        console.error("Error:", error);
-        alert("❌ Gagal mengirim data. Pastikan koneksi internet Anda stabil.");
-        updateState({ isSubmitting: false });
-    }
+    );
 };
 
 window.showRujukanModal = function (noRm) {
@@ -1129,7 +1174,7 @@ window.simpanRujukan = async function (noRm) {
     const lokasi = document.getElementById('modal-lokasi').value.trim();
 
     if (isDirujuk && !lokasi) {
-        alert("Mohon ketik lokasi rujukan!");
+        showAlertModal("⚠️", "Perhatian", "Mohon ketik lokasi rujukan!");
         return;
     }
 
@@ -1150,18 +1195,19 @@ window.simpanRujukan = async function (noRm) {
         const result = await response.json();
 
         if (result.status === 'success') {
-            alert("✅ Status Rujukan Berhasil Disimpan");
-            document.getElementById('rujukan-modal').remove();
-            await loadData();
-            updateState({}); // force re-render
+            showAlertModal("✅", "Berhasil", "Status Rujukan Berhasil Disimpan", async () => {
+                document.getElementById('rujukan-modal').remove();
+                await loadData();
+                updateState({}); // force re-render
+            });
         } else {
-            alert("❌ Gagal menyimpan: " + result.message);
+            showAlertModal("❌", "Gagal", "Gagal menyimpan: " + result.message);
             btnSimpan.textContent = 'Simpan';
             btnSimpan.disabled = false;
         }
     } catch (error) {
         console.error("Error:", error);
-        alert("❌ Terjadi kesalahan koneksi.");
+        showAlertModal("📡", "Gangguan Jaringan", "Terjadi kesalahan koneksi.");
         btnSimpan.textContent = 'Simpan';
         btnSimpan.disabled = false;
     }
@@ -1238,7 +1284,7 @@ function renderApp() {
 
 window.exportToPDF = function () {
     if (typeof jspdf === 'undefined') {
-        alert("Library PDF belum termuat sempurna. Silakan muat ulang halaman.");
+        showAlertModal("⚠️", "Library Belum Siap", "Library PDF belum termuat sempurna. Silakan muat ulang halaman.");
         return;
     }
 
@@ -1309,7 +1355,7 @@ window.exportToPDF = function () {
 
 window.exportToExcel = function () {
     if (typeof XLSX === 'undefined') {
-        alert("Library Excel belum termuat sempurna. Silakan muat ulang halaman.");
+        showAlertModal("⚠️", "Library Belum Siap", "Library Excel belum termuat sempurna. Silakan muat ulang halaman.");
         return;
     }
 
@@ -1451,7 +1497,7 @@ window.saveAccountSettings = async function () {
         const pwd = pwdInputs[i].value.trim();
 
         if (req === 'YA' && !pwd) {
-            alert(`Password untuk ${role} tidak boleh kosong jika diwajibkan!`);
+            showAlertModal("⚠️", "Input Tidak Valid", `Password untuk ${role} tidak boleh kosong jika diwajibkan!`);
             return;
         }
 
@@ -1469,16 +1515,17 @@ window.saveAccountSettings = async function () {
         });
         const result = await response.json();
         if (result.status === 'success') {
-            alert("✅ Pengaturan akun berhasil disimpan.");
-            document.getElementById('account-modal').remove();
-            await loadData(); // Reload settings
+            showAlertModal("✅", "Berhasil", "Pengaturan akun berhasil disimpan.", async () => {
+                document.getElementById('account-modal').remove();
+                await loadData();
+            });
         } else {
-            alert("❌ Gagal menyimpan: " + result.message);
+            showAlertModal("❌", "Gagal", "Gagal menyimpan: " + result.message);
             btn.textContent = "Simpan Pengaturan";
             btn.disabled = false;
         }
     } catch (e) {
-        alert("❌ Terjadi kesalahan jaringan.");
+        showAlertModal("📡", "Gangguan Jaringan", "Terjadi kesalahan jaringan.");
         btn.textContent = "Simpan Pengaturan";
         btn.disabled = false;
     }
@@ -1642,28 +1689,36 @@ function initDashboardCharts() {
     createOrUpdate('chart-rujukan', 'doughnut', Object.keys(rujukCount), Object.values(rujukCount), ['#ef4444', '#10b981']);
 }
 
-window.setPatientStatus = async function(rmNo, status) {
-    if (!confirm(`Apakah Anda yakin ingin mengatur status pasien ini menjadi "${status}"?`)) return;
-
-    try {
-        const response = await fetch(scriptURL, {
-            method: 'POST',
-            body: JSON.stringify({
-                action: 'set_status',
-                no: rmNo,
-                status_akhir_superadmin: status
-            })
-        });
-        const result = await response.json();
-        if (result.status === 'success') {
-            alert('Status berhasil diupdate!');
-            await loadData();
-        } else {
-            alert('Gagal mengupdate status: ' + result.message);
+window.setPatientStatus = function(rmNo, status) {
+    showConfirmModal(
+        "🔄",
+        "Ubah Status Pasien",
+        `Apakah Anda yakin ingin mengatur status akhir pasien ini menjadi "<strong>${status}</strong>"?`,
+        "Ya, Ubah Status",
+        "btn-primary-modal",
+        async () => {
+            try {
+                const response = await fetch(scriptURL, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'set_status',
+                        no: rmNo,
+                        status_akhir_superadmin: status
+                    })
+                });
+                const result = await response.json();
+                if (result.status === 'success') {
+                    showAlertModal("✅", "Berhasil", "Status pasien berhasil diupdate!", async () => {
+                        await loadData();
+                    });
+                } else {
+                    showAlertModal("❌", "Gagal", "Gagal mengupdate status: " + result.message);
+                }
+            } catch (e) {
+                showAlertModal("📡", "Gangguan Jaringan", "Terjadi kesalahan jaringan saat mencoba menghubungi server.");
+            }
         }
-    } catch (e) {
-        alert('Terjadi kesalahan jaringan.');
-    }
+    );
 };
 
 function startClock() {
