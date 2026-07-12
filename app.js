@@ -344,11 +344,11 @@ function renderHeader() {
                     ⏱️ --
                 </div>
             </div>
-            <div class="role-switcher header-controls" style="display: flex; gap: 0.75rem; align-items: center; padding: 0.5rem; background: var(--gray-light); border: 1px solid var(--gray-border); border-radius: var(--radius-md);">
-                <span style="font-weight: 500; color: var(--text-secondary); display: flex; align-items: center; white-space: nowrap;">
+            <div class="role-switcher header-controls" style="display: flex; gap: 0.75rem; align-items: center; padding: 0.5rem; background: var(--gray-light); border: 1px solid var(--gray-border); border-radius: var(--radius-md); flex-wrap: wrap; justify-content: center;">
+                <span style="font-weight: 500; color: var(--text-secondary); display: flex; align-items: center; white-space: normal; text-align: center; justify-content: center; flex-wrap: wrap; margin-bottom: 0.25rem;">
                     Login sebagai: <span style="color: var(--text-main); font-weight: 700; margin-left: 0.5rem; padding: 0.25rem 0.75rem; background: white; border-radius: 20px; border: 1px solid var(--gray-border);">${roleText}</span>
                 </span>
-                <div style="display: flex; gap: 0.5rem; align-items: center; margin-left: auto;">
+                <div class="header-controls-buttons" style="display: flex; gap: 0.5rem; align-items: center; margin-left: auto; margin-right: auto; flex-wrap: wrap; justify-content: center;">
                     ${(state.role === 'superadmin' || state.role === 'dinkes') ? `
                         <button class="btn-role" onclick="updateState({view: 'dashboard'})" style="${state.view === 'dashboard' ? 'background: #3b82f6; color: white;' : 'color: #3b82f6; border: 1px solid #3b82f6; background: rgba(59,130,246,0.1);'}">📊 Dashboard</button>
                         <button class="btn-role" onclick="updateState({view: 'list', currentPage: 1})" style="${state.view === 'list' ? 'background: #3b82f6; color: white;' : 'color: #3b82f6; border: 1px solid #3b82f6; background: rgba(59,130,246,0.1);'}">📋 Daftar Pasien</button>
