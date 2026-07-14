@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="100" fill="#E8F4F8" />
+  <!-- Medical Cross -->
+  <path d="M400 100 h-40 v-40 a10 10 0 0 0 -10 -10 h-20 a10 10 0 0 0 -10 10 v40 h-40 a10 10 0 0 0 -10 10 v20 a10 10 0 0 0 10 10 h40 v40 a10 10 0 0 0 10 10 h20 a10 10 0 0 0 10 -10 v-40 h40 a10 10 0 0 0 10 -10 v-20 a10 10 0 0 0 -10 -10 z" fill="#FF5252" opacity="0.8"/>
+  <!-- Baby face -->
+  <circle cx="256" cy="220" r="80" fill="#FFDDBB" />
+  <!-- Eyes -->
+  <circle cx="226" cy="210" r="10" fill="#4A4A4A" />
+  <circle cx="286" cy="210" r="10" fill="#4A4A4A" />
+  <!-- Cheeks -->
+  <circle cx="206" cy="230" r="12" fill="#FF8A8A" opacity="0.4" />
+  <circle cx="306" cy="230" r="12" fill="#FF8A8A" opacity="0.4" />
+  <!-- Mouth -->
+  <path d="M 246 240 Q 256 250 266 240" stroke="#4A4A4A" stroke-width="4" stroke-linecap="round" fill="none" />
+  <!-- Blanket/Swaddle -->
+  <path d="M 126 300 Q 256 480 386 300 Q 256 240 126 300 Z" fill="#4A90E2" />
+  <!-- Swaddle folds -->
+  <path d="M 176 340 Q 256 390 336 340" stroke="#357ABD" stroke-width="6" stroke-linecap="round" fill="none" />
+</svg>
